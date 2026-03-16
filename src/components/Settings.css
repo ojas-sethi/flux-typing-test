@@ -1,0 +1,70 @@
+/* ── Floating Dock ─────────────────────────────────────────── */
+.settings {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: var(--bg-glass);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 0.4rem 0.5rem;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: var(--shadow);
+  z-index: 50;
+  transition: opacity var(--transition), transform var(--transition);
+}
+
+.settings.faded {
+  opacity: 0;
+  transform: translateX(-50%) translateY(20px);
+  pointer-events: none;
+}
+
+.settings .divider {
+  width: 1px;
+  height: 1rem;
+  background: var(--border);
+  margin: 0 0.25rem;
+  flex-shrink: 0;
+}
+
+.settings button {
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.45rem 0.9rem;
+  border: none;
+  border-radius: 100px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+
+.settings button:hover {
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+}
+
+.settings button.active {
+  color: var(--accent);
+  background: var(--accent-dim);
+  font-weight: 600;
+}
+
+/* ── Responsive ───────────────────────────────────────────── */
+@media (max-width: 700px) {
+  .settings {
+    bottom: 1.25rem;
+    padding: 0.35rem 0.4rem;
+  }
+  .settings button {
+    padding: 0.4rem 0.65rem;
+    font-size: 0.7rem;
+  }
+}

@@ -1,0 +1,176 @@
+/* ── Layout ────────────────────────────────────────────────── */
+.app {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 2rem;
+  position: relative;
+  width: 100%;
+}
+
+/* ── Progress Bar Timer ───────────────────────────────────── */
+.progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--bg-elevated);
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.progress-bar.active {
+  opacity: 1;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent-glow);
+  transition: width 0.3s linear;
+  border-radius: 0 2px 2px 0;
+}
+
+/* ── Header ────────────────────────────────────────────────── */
+header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 2.5rem;
+  z-index: 100;
+  transition: opacity var(--transition), transform var(--transition);
+}
+
+header.faded {
+  opacity: 0;
+  transform: translateY(-8px);
+  pointer-events: none;
+}
+
+.logo {
+  font-family: var(--font-sans);
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: -0.5px;
+}
+
+.theme-toggle {
+  background: var(--bg-glass);
+  border: 1px solid var(--border);
+  padding: 0.4rem 1.1rem;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition);
+  border-radius: 100px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.theme-toggle:hover {
+  color: var(--text-primary);
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+/* ── Main Content ─────────────────────────────────────────── */
+.main-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 780px;
+}
+
+/* ── Timer Display ────────────────────────────────────────── */
+.timer-display {
+  font-family: var(--font-mono);
+  font-size: 1.75rem;
+  font-weight: 600;
+  color: var(--accent);
+  opacity: 0;
+  height: 0;
+  overflow: hidden;
+  transition: opacity 0.2s ease, height var(--transition), margin var(--transition);
+  margin-bottom: 0;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.timer-display.visible {
+  opacity: 0.5;
+  height: 2.25rem;
+  margin-bottom: 1.25rem;
+}
+
+/* ── Typing Card ──────────────────────────────────────────── */
+.typing-card {
+  width: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 2rem 2.5rem;
+  box-shadow: var(--shadow), var(--glow);
+  transition: box-shadow var(--transition), border-color var(--transition);
+  position: relative;
+}
+
+.typing-card:focus-within {
+  border-color: var(--border-accent);
+}
+
+/* ── Restart Hint ─────────────────────────────────────────── */
+.restart-hint {
+  margin-top: 1.25rem;
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  opacity: 0;
+  transition: opacity var(--transition);
+  letter-spacing: 0.2px;
+}
+
+.restart-hint.visible {
+  opacity: 0.5;
+}
+
+.restart-hint kbd {
+  display: inline-block;
+  padding: 0.2em 0.5em;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  margin: 0 0.12em;
+  line-height: 1;
+}
+
+/* ── Responsive ───────────────────────────────────────────── */
+@media (max-width: 700px) {
+  header {
+    padding: 1.25rem 1.25rem;
+  }
+  .main-content {
+    max-width: 100%;
+  }
+  .typing-card {
+    padding: 1.5rem 1.25rem;
+    border-radius: 16px;
+  }
+  .app {
+    padding: 1rem;
+  }
+}

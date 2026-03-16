@@ -1,0 +1,90 @@
+/* ── Reset ─────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --font-mono: "IBM Plex Mono", monospace;
+  --font-sans: "Outfit", -apple-system, BlinkMacSystemFont, sans-serif;
+  --radius: 12px;
+  --radius-lg: 20px;
+  --transition: 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-theme="dark"] {
+  --bg: #09090b;
+  --bg-surface: #111113;
+  --bg-elevated: #1a1a1e;
+  --bg-card: #111113;
+  --bg-glass: rgba(17, 17, 19, 0.75);
+  --text-primary: #e4e4e7;
+  --text-secondary: #71717a;
+  --text-muted: #52525b;
+  --accent: #06b6d4;
+  --accent-dim: rgba(6, 182, 212, 0.08);
+  --accent-glow: rgba(6, 182, 212, 0.35);
+  --correct: #f4f4f5;
+  --incorrect: #f43f5e;
+  --incorrect-bg: rgba(244, 63, 94, 0.1);
+  --extra: #e11d48;
+  --caret: #22d3ee;
+  --border: rgba(255, 255, 255, 0.07);
+  --border-accent: rgba(6, 182, 212, 0.15);
+  --chart-line: #06b6d4;
+  --chart-grid: rgba(255, 255, 255, 0.06);
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  --glow: 0 0 24px rgba(6, 182, 212, 0.08);
+}
+
+[data-theme="light"] {
+  --bg: #f4f4f5;
+  --bg-surface: #ffffff;
+  --bg-elevated: #e9e9ec;
+  --bg-card: #ffffff;
+  --bg-glass: rgba(255, 255, 255, 0.75);
+  --text-primary: #18181b;
+  --text-secondary: #71717a;
+  --text-muted: #a1a1aa;
+  --accent: #0891b2;
+  --accent-dim: rgba(8, 145, 178, 0.07);
+  --accent-glow: rgba(8, 145, 178, 0.2);
+  --correct: #18181b;
+  --incorrect: #e11d48;
+  --incorrect-bg: rgba(225, 29, 72, 0.06);
+  --extra: #be123c;
+  --caret: #06b6d4;
+  --border: rgba(0, 0, 0, 0.07);
+  --border-accent: rgba(8, 145, 178, 0.15);
+  --chart-line: #0891b2;
+  --chart-grid: rgba(0, 0, 0, 0.06);
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+  --glow: 0 0 24px rgba(8, 145, 178, 0.06);
+}
+
+/* ── Base ──────────────────────────────────────────────────── */
+html {
+  font-size: 16px;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--text-primary);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  transition: background 0.4s ease, color var(--transition);
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}

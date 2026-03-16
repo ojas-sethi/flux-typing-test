@@ -1,0 +1,147 @@
+/* ── Wrapper ───────────────────────────────────────────────── */
+.typing-wrapper {
+  position: relative;
+  width: 100%;
+  cursor: text;
+}
+
+.hidden-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+/* ── Typing Area ──────────────────────────────────────────── */
+.typing-area {
+  font-family: var(--font-mono);
+  font-size: 1.3rem;
+  line-height: 2.2;
+  letter-spacing: 0.2px;
+  position: relative;
+  overflow: hidden;
+  height: calc(1.3rem * 2.2 * 3);
+  transition: filter var(--transition), opacity var(--transition), transform var(--transition);
+}
+
+.typing-area.blurred {
+  filter: blur(6px);
+  opacity: 0.25;
+  transform: scale(0.998);
+}
+
+.typing-area::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: calc(1.3rem * 2.2 * 1.2);
+  background: linear-gradient(transparent, var(--bg-card));
+  pointer-events: none;
+  z-index: 2;
+}
+
+.words {
+  position: relative;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.word {
+  display: inline-block;
+  margin: 0 0.4em 0 0;
+}
+
+/* ── Letters ──────────────────────────────────────────────── */
+.letter {
+  display: inline-block;
+  color: var(--text-muted);
+  transition: color 0.08s ease;
+  position: relative;
+}
+
+.letter.correct {
+  color: var(--correct);
+}
+
+.letter.incorrect {
+  color: var(--incorrect);
+  background: var(--incorrect-bg);
+  border-radius: 2px;
+}
+
+.letter.missed {
+  opacity: 0.3;
+  text-decoration: underline;
+  text-decoration-color: var(--incorrect);
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1.5px;
+}
+
+.letter.extra {
+  color: var(--extra);
+  opacity: 0.45;
+}
+
+/* ── Caret (vertical line with glow) ─────────────────────── */
+.caret {
+  position: absolute;
+  width: 2.5px;
+  height: 1.5rem;
+  background: var(--caret);
+  border-radius: 2px;
+  top: 0;
+  left: 0;
+  z-index: 10;
+  transition: left 0.08s cubic-bezier(0.16, 1, 0.3, 1),
+              top 0.12s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 0 10px var(--accent-glow),
+              0 0 3px var(--accent-glow);
+}
+
+.caret.blink {
+  animation: caretFade 1.1s ease-in-out infinite;
+}
+
+@keyframes caretFade {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.15; }
+}
+
+/* ── Focus Overlay ────────────────────────────────────────── */
+.focus-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+}
+
+.focus-overlay span {
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  letter-spacing: 0.2px;
+  font-weight: 500;
+  padding: 0.5rem 1.3rem;
+  background: var(--bg-elevated);
+  border-radius: 100px;
+  border: 1px solid var(--border);
+}
+
+/* ── Responsive ───────────────────────────────────────────── */
+@media (max-width: 700px) {
+  .typing-area {
+    font-size: 1.05rem;
+    height: calc(1.05rem * 2.2 * 3);
+  }
+  .typing-area::after {
+    height: calc(1.05rem * 2.2 * 1.2);
+  }
+  .caret {
+    height: 1.2rem;
+    width: 2px;
+  }
+}

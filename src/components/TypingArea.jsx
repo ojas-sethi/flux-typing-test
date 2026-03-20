@@ -8,6 +8,7 @@ export default function TypingArea({
   currentWordIndex,
   isRunning,
   isFinished,
+  disabled,
   onInput,
   onGoToPrevWord,
   onClearCurrentWord,
@@ -23,15 +24,20 @@ export default function TypingArea({
 
   // Focus input
   const focusInput = useCallback(() => {
-    if (inputRef.current && !isFinished) {
+    if (inputRef.current && !isFinished && !disabled) {
       inputRef.current.focus();
     }
-  }, [isFinished]);
+  }, [isFinished, disabled]);
 
   // Auto focus on mount and when test resets
   useEffect(() => {
-    focusInput();
-  }, [focusInput, words]);
+    if (disabled && inputRef.current) {
+      inputRef.current.blur();
+    } else {
+      focusInput();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusInput, words.length, disabled]);
 
   // Click to focus
   const handleWrapperClick = useCallback(() => {

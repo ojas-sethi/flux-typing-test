@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from "react";
 import "./Results.css";
 
-export default function Results({ visible, results, onRestart }) {
+export default function Results({ visible, results, onRestart, saveStatus, isLoggedIn }) {
   const canvasRef = useRef(null);
 
   const drawChart = useCallback(() => {
@@ -160,6 +160,14 @@ export default function Results({ visible, results, onRestart }) {
               {results.missedChars} missed
             </span>
           </div>
+
+          {isLoggedIn && saveStatus && (
+            <span className={`save-status ${saveStatus}`}>
+              {saveStatus === "saving" && "saving..."}
+              {saveStatus === "saved" && "result saved"}
+              {saveStatus === "error" && "save failed"}
+            </span>
+          )}
 
           <button className="restart-btn" onClick={onRestart} tabIndex={-1}>
             try again

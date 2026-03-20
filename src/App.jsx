@@ -1,13 +1,20 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useTypingTest } from "./hooks/useTypingTest";
 import { useTheme } from "./hooks/useTheme";
+import { useAuth } from "./hooks/useAuth";
+import { saveTestResult } from "./services/firestore";
 import Settings from "./components/Settings";
 import TypingArea from "./components/TypingArea";
 import Results from "./components/Results";
+import Profile from "./components/Profile";
+import UsernameSetup from "./components/UsernameSetup";
+import Social from "./components/Social";
+import Race from "./components/Race";
 import "./App.css";
 
 export default function App() {
   const { theme, toggleTheme } = useTheme();
+  const { user, profile, loading: authLoading, needsUsername, signIn, signOut, refreshProfile } = useAuth();
   const {
     mode,
     duration,
@@ -28,22 +35,50 @@ export default function App() {
   } = useTypingTest();
 
   const [results, setResults] = useState(null);
+  const [profileVisible, setProfileVisible] = useState(false);
+  const [socialVisible, setSocialVisible] = useState(false);
+  const [raceVisible, setRaceVisible] = useState(false);
+  const [saveStatus, setSaveStatus] = useState(null); // null | 'saving' | 'saved' | 'error'
 
-  // When test finishes, compute results once
+  // When test finishes, compute results once and save if logged in
   const didComputeResults = useRef(false);
   useEffect(() => {
     if (isFinished && !didComputeResults.current) {
       didComputeResults.current = true;
-      setResults(getResults());
+      const r = getResults();
+      setResults(r);
+
+      // Auto-save if logged in
+      if (user) {
+        setSaveStatus("saving");
+        saveTestResult(user.uid, {
+          wpm: r.wpm,
+          rawWpm: r.rawWpm,
+          accuracy: r.accuracy,
+          consistency: r.consistency,
+          totalChars: r.totalChars,
+          correctChars: r.correctChars,
+          incorrectChars: r.incorrectChars,
+          extraChars: r.extraChars,
+          missedChars: r.missedChars,
+          mode,
+          duration,
+          wpmHistory: r.wpmHistory,
+        })
+          .then(() => setSaveStatus("saved"))
+          .catch(() => setSaveStatus("error"));
+      }
     }
     if (!isFinished) {
       didComputeResults.current = false;
+      setSaveStatus(null);
     }
-  }, [isFinished, getResults]);
+  }, [isFinished, getResults, user, mode, duration]);
 
   // Restart handler
   const handleRestart = useCallback(() => {
     setResults(null);
+    setSaveStatus(null);
     reset();
   }, [reset]);
 
@@ -61,7 +96,9 @@ export default function App() {
         e.preventDefault();
         tabPressed = true;
         clearTimeout(tabTimeout);
-        tabTimeout = setTimeout(() => { tabPressed = false; }, 1000);
+        tabTimeout = setTimeout(() => {
+          tabPressed = false;
+        }, 1000);
         return;
       }
 
@@ -86,6 +123,11 @@ export default function App() {
 
   const progress = isRunning ? (timeLeft / duration) * 100 : 100;
 
+  const handleSignOut = useCallback(() => {
+    signOut();
+    setProfileVisible(false);
+  }, [signOut]);
+
   return (
     <>
       {/* Progress bar timer */}
@@ -96,14 +138,62 @@ export default function App() {
       <div className="app">
         <header className={isRunning ? "faded" : ""}>
           <div className="logo">flux</div>
-          <button
-            className="theme-toggle"
-            onClick={toggleTheme}
-            tabIndex={-1}
-            aria-label="Toggle theme"
-          >
-            {theme === "dark" ? "light" : "dark"}
-          </button>
+          <div className="header-actions">
+            <button
+              className="theme-toggle"
+              onClick={toggleTheme}
+              tabIndex={-1}
+              aria-label="Toggle theme"
+            >
+              {theme === "dark" ? "light" : "dark"}
+            </button>
+
+            {!authLoading &&
+              (user ? (
+                <>
+                  <button
+                    className="social-nav-btn"
+                    onClick={() => setRaceVisible(true)}
+                    tabIndex={-1}
+                  >
+                    race
+                  </button>
+                  <button
+                    className="social-nav-btn"
+                    onClick={() => setSocialVisible(true)}
+                    tabIndex={-1}
+                  >
+                    friends
+                  </button>
+                  <button
+                    className="auth-avatar"
+                    onClick={() => setProfileVisible(true)}
+                    tabIndex={-1}
+                    aria-label="Profile"
+                  >
+                    {user.photoURL ? (
+                      <img
+                        src={user.photoURL}
+                        alt=""
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <span className="avatar-fallback">
+                        {(user.displayName || user.email || "?")[0].toUpperCase()}
+                      </span>
+                    )}
+                  </button>
+                </>
+              ) : (
+                <button
+                  className="sign-in-btn"
+                  onClick={signIn}
+                  tabIndex={-1}
+                >
+                  sign in
+                </button>
+              ))}
+          </div>
         </header>
 
         <main className="main-content">
@@ -119,6 +209,7 @@ export default function App() {
               currentWordIndex={currentWordIndex}
               isRunning={isRunning}
               isFinished={isFinished}
+              disabled={needsUsername || profileVisible || socialVisible || raceVisible}
               onInput={handleInput}
               onGoToPrevWord={goToPrevWord}
               onClearCurrentWord={clearCurrentWord}
@@ -140,7 +231,43 @@ export default function App() {
         faded={isRunning}
       />
 
-      <Results visible={isFinished} results={results} onRestart={handleRestart} />
+      <Results
+        visible={isFinished}
+        results={results}
+        onRestart={handleRestart}
+        saveStatus={saveStatus}
+        isLoggedIn={!!user}
+      />
+
+      <Profile
+        visible={profileVisible}
+        user={user}
+        onClose={() => setProfileVisible(false)}
+        onSignOut={handleSignOut}
+        onOpenSocial={() => {
+          setProfileVisible(false);
+          setSocialVisible(true);
+        }}
+      />
+
+      <UsernameSetup
+        visible={needsUsername}
+        user={user}
+        onComplete={refreshProfile}
+      />
+
+      <Social
+        visible={socialVisible}
+        user={user}
+        onClose={() => setSocialVisible(false)}
+      />
+
+      <Race
+        visible={raceVisible}
+        user={user}
+        profile={profile}
+        onClose={() => setRaceVisible(false)}
+      />
     </>
   );
 }

@@ -150,6 +150,27 @@
 .char-stat .dot.extra { background: var(--extra); }
 .char-stat .dot.missed { background: var(--text-secondary); }
 
+/* ── Save Status ──────────────────────────────────────────── */
+.save-status {
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  transition: opacity var(--transition);
+}
+
+.save-status.saving {
+  color: var(--text-muted);
+}
+
+.save-status.saved {
+  color: var(--accent);
+}
+
+.save-status.error {
+  color: var(--incorrect);
+}
+
 /* ── Restart Button ───────────────────────────────────────── */
 .restart-btn {
   font-family: var(--font-sans);

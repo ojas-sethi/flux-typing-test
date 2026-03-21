@@ -76,7 +76,7 @@ export default function UsernameSetup({ visible, user, onComplete }) {
       <div className="username-modal">
         <h2 className="username-title">choose your username</h2>
         <p className="username-subtitle">
-          This is how others will find you on flux.
+          This is how others will find you on klacks.
           <br />
           <span className="username-cooldown-note">You can only change your username once every 6 months.</span>
         </p>

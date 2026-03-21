@@ -111,11 +111,7 @@ export function useRaceTypingTest(raceWords, raceDuration) {
 
   const handleInput = useCallback(
     (value) => {
-      if (isFinished || !canTypeRef.current) return;
-
-      if (!isRunning) {
-        startTimer();
-      }
+      if (isFinished || !canTypeRef.current || !isRunning) return;
 
       if (value.endsWith(" ")) {
         const input = currentInputRef.current;
@@ -134,7 +130,7 @@ export function useRaceTypingTest(raceWords, raceDuration) {
 
       setCurrentInput(value);
     },
-    [isFinished, isRunning, startTimer]
+    [isFinished, isRunning]
   );
 
   const goToPrevWord = useCallback(() => {
@@ -227,9 +223,12 @@ export function useRaceTypingTest(raceWords, raceDuration) {
     };
   }, [raceDuration, wpmHistory]);
 
-  // Allow race to enable typing (after countdown)
+  // Allow race to enable typing AND start the timer (after countdown)
   const enableTyping = useCallback(() => {
     canTypeRef.current = true;
+    startTimeRef.current = Date.now();
+    lastRecordedSecond.current = 0;
+    setIsRunning(true);
   }, []);
 
   const reset = useCallback(() => {

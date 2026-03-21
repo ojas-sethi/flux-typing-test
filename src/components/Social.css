@@ -78,6 +78,45 @@
   background: var(--incorrect-bg);
 }
 
+.social-friend-btn.pending {
+  border-color: var(--text-muted);
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.social-friend-btn.pending:hover {
+  border-color: var(--incorrect);
+  color: var(--incorrect);
+  background: var(--incorrect-bg);
+}
+
+.social-friend-btn.accept {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.social-friend-btn.accept:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+.social-friend-btn.decline {
+  border-color: var(--border);
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.social-friend-btn.decline:hover {
+  border-color: var(--incorrect);
+  color: var(--incorrect);
+}
+
+.social-friend-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* ── Search ───────────────────────────────────────────────── */
 .social-search-wrapper {
   display: flex;
@@ -243,6 +282,55 @@
 .social-action-btn.is-friend:hover {
   border-color: var(--incorrect);
   color: var(--incorrect);
+}
+
+.social-action-btn.pending {
+  border-color: var(--text-muted);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.social-action-btn.pending:hover {
+  border-color: var(--incorrect);
+  color: var(--incorrect);
+  cursor: pointer;
+}
+
+.social-action-btn.accept {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.social-action-btn.accept:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+.social-action-btn.decline {
+  border-color: var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  padding: 0.35rem 0.55rem;
+  font-size: 0.6rem;
+}
+
+.social-action-btn.decline:hover {
+  border-color: var(--incorrect);
+  color: var(--incorrect);
+}
+
+.social-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.social-action-group {
+  display: flex;
+  gap: 0.35rem;
+  flex-shrink: 0;
+  margin-left: 0.75rem;
 }
 
 .social-action-btn.view {

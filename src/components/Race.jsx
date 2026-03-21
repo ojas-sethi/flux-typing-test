@@ -6,6 +6,7 @@ import {
   startCountdown,
   setRaceActive,
   setRaceFinished,
+  resetRace,
   updateRaceProgress,
   submitRaceResults,
   leaveRace,
@@ -39,6 +40,12 @@ export default function Race({ visible, user, profile, onClose }) {
   const progressThrottleRef = useRef(0);
   const didSubmitResults = useRef(false);
 
+  // Refs to avoid stale closures in intervals
+  const raceDataRef = useRef(null);
+  const phaseRef = useRef(phase);
+  raceDataRef.current = raceData;
+  phaseRef.current = phase;
+
   const typing = useRaceTypingTest(
     raceData?.words || [],
     raceData?.duration || 30
@@ -49,12 +56,25 @@ export default function Race({ visible, user, profile, onClose }) {
     unsubRaceRef.current?.();
     unsubProgressRef.current?.();
 
-    unsubRaceRef.current = onRaceChange(id, (data) => {
-      setRaceData(data);
-    });
-    unsubProgressRef.current = onProgressChange(id, (prog) => {
-      setProgress(prog);
-    });
+    unsubRaceRef.current = onRaceChange(
+      id,
+      (data) => {
+        setRaceData(data);
+      },
+      (err) => {
+        setError("Connection lost: " + err.message);
+        setPhase("menu");
+      }
+    );
+    unsubProgressRef.current = onProgressChange(
+      id,
+      (prog) => {
+        setProgress(prog);
+      },
+      (err) => {
+        console.error("Progress listener error:", err);
+      }
+    );
   }, []);
 
   // ── Cleanup on unmount or close ──
@@ -84,8 +104,10 @@ export default function Race({ visible, user, profile, onClose }) {
   // ── React to race status changes ──
   useEffect(() => {
     if (!raceData) return;
+    const status = raceData.status;
 
-    if (raceData.status === "countdown" && phase === "lobby") {
+    // Countdown started — begin local countdown
+    if (status === "countdown" && phase === "lobby") {
       setPhase("countdown");
       setCountdown(COUNTDOWN_SECONDS);
       typing.reset();
@@ -99,18 +121,39 @@ export default function Race({ visible, user, profile, onClose }) {
           clearInterval(countdownTimerRef.current);
           setPhase("racing");
           typing.enableTyping();
-          // Host sets race to active
-          if (raceData.hostUid === user?.uid) {
-            setRaceActive(raceData.id);
+          // Host sets race to active (use ref to avoid stale closure)
+          const rd = raceDataRef.current;
+          if (rd && rd.hostUid === user?.uid) {
+            setRaceActive(rd.id).catch((err) =>
+              console.error("Failed to set race active:", err)
+            );
           }
         }
       }, 1000);
     }
 
-    if (raceData.status === "finished" && phase === "racing") {
+    // Race is now active — if we missed countdown or are still counting, jump to racing
+    if (status === "racing" && (phase === "lobby" || phase === "countdown")) {
+      clearInterval(countdownTimerRef.current);
+      setPhase("racing");
+      typing.enableTyping();
+    }
+
+    // Race finished
+    if (status === "finished" && (phase === "racing" || phase === "countdown")) {
+      clearInterval(countdownTimerRef.current);
       setPhase("results");
     }
-  }, [raceData?.status]);
+
+    // Race reset back to waiting (race again) — everyone goes back to lobby
+    if (status === "waiting" && (phase === "results" || phase === "racing" || phase === "countdown")) {
+      clearInterval(countdownTimerRef.current);
+      setProgress({});
+      didSubmitResults.current = false;
+      typing.reset();
+      setPhase("lobby");
+    }
+  }, [raceData?.status, phase]);
 
   // ── Report progress while racing ──
   useEffect(() => {
@@ -552,21 +595,24 @@ export default function Race({ visible, user, profile, onClose }) {
                   ))}
               </div>
 
-              {isHost && (
+              {isHost ? (
                 <button
                   className="race-primary-btn"
-                  onClick={() => {
-                    setPhase("menu");
-                    setRaceId(null);
-                    setRaceData(null);
-                    setProgress({});
-                    setError(null);
-                    didSubmitResults.current = false;
-                    typing.reset();
+                  onClick={async () => {
+                    try {
+                      const newWords = generateWordList(raceData.mode || "words", 200);
+                      await resetRace(raceId, newWords);
+                    } catch (err) {
+                      setError(err.message);
+                    }
                   }}
                 >
                   race again
                 </button>
+              ) : (
+                <span className="race-waiting-text">
+                  waiting for host to start a new race...
+                </span>
               )}
             </div>
           </>

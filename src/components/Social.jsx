@@ -3,7 +3,13 @@ import {
   searchByUsername,
   getFriendProfiles,
   getTestHistory,
-  addFriend,
+  sendFriendRequest,
+  getIncomingRequests,
+  getOutgoingRequests,
+  acceptFriendRequest,
+  declineFriendRequest,
+  cancelFriendRequest,
+  syncAcceptedRequests,
   removeFriend,
   getUserProfile,
 } from "../services/firestore";
@@ -18,6 +24,12 @@ export default function Social({ visible, user, onClose }) {
   const [loadingFriends, setLoadingFriends] = useState(true);
   const [myProfile, setMyProfile] = useState(null);
 
+  // Friend requests
+  const [incomingRequests, setIncomingRequests] = useState([]);
+  const [outgoingRequests, setOutgoingRequests] = useState([]);
+  const [loadingRequests, setLoadingRequests] = useState(true);
+  const [actionLoading, setActionLoading] = useState(null); // uid being acted on
+
   // Sub-view: viewing another user's profile
   const [viewingUser, setViewingUser] = useState(null);
   const [viewingTests, setViewingTests] = useState([]);
@@ -27,25 +39,46 @@ export default function Social({ visible, user, onClose }) {
   const debounceRef = useRef(null);
   const chartRef = useRef(null);
 
-  // Load friends when visible
+  // Load friends and requests when visible
   useEffect(() => {
     if (visible && user) {
-      setLoadingFriends(true);
-      getUserProfile(user.uid).then((prof) => {
-        setMyProfile(prof);
-        const friendUids = prof?.friends || [];
-        if (friendUids.length) {
-          getFriendProfiles(friendUids).then((f) => {
-            setFriends(f);
-            setLoadingFriends(false);
-          });
-        } else {
-          setFriends([]);
-          setLoadingFriends(false);
-        }
-      });
+      loadAll();
     }
   }, [visible, user]);
+
+  const loadAll = useCallback(async () => {
+    if (!user) return;
+    setLoadingFriends(true);
+    setLoadingRequests(true);
+
+    try {
+      // Sync any accepted outgoing requests first
+      await syncAcceptedRequests(user.uid);
+
+      // Load profile, friends, and requests in parallel
+      const [prof, incoming, outgoing] = await Promise.all([
+        getUserProfile(user.uid),
+        getIncomingRequests(user.uid),
+        getOutgoingRequests(user.uid),
+      ]);
+
+      setMyProfile(prof);
+      setIncomingRequests(incoming);
+      setOutgoingRequests(outgoing);
+      setLoadingRequests(false);
+
+      const friendUids = prof?.friends || [];
+      if (friendUids.length) {
+        const f = await getFriendProfiles(friendUids);
+        setFriends(f);
+      } else {
+        setFriends([]);
+      }
+    } catch (err) {
+      console.error("Failed to load social data:", err);
+    }
+    setLoadingFriends(false);
+  }, [user]);
 
   // Reset when closing
   useEffect(() => {
@@ -73,7 +106,6 @@ export default function Social({ visible, user, onClose }) {
       debounceRef.current = setTimeout(async () => {
         try {
           const results = await searchByUsername(query, 8);
-          // Filter out self
           setSearchResults(results.filter((r) => r.uid !== user?.uid));
         } catch {
           setSearchResults([]);
@@ -97,34 +129,116 @@ export default function Social({ visible, user, onClose }) {
     setViewingLoading(false);
   }, []);
 
-  // Add/remove friend
-  const handleToggleFriend = useCallback(
-    async (friendUid) => {
+  // Send friend request
+  const handleSendRequest = useCallback(
+    async (targetUid) => {
       if (!user || !myProfile) return;
-      const isFriend = (myProfile.friends || []).includes(friendUid);
-
-      if (isFriend) {
-        await removeFriend(user.uid, friendUid);
-        setMyProfile((p) => ({
-          ...p,
-          friends: (p.friends || []).filter((id) => id !== friendUid),
-        }));
-        setFriends((f) => f.filter((fr) => fr.uid !== friendUid));
-      } else {
-        await addFriend(user.uid, friendUid);
-        setMyProfile((p) => ({
-          ...p,
-          friends: [...(p.friends || []), friendUid],
-        }));
-        // Add to friends list if we have their data
-        const prof = await getUserProfile(friendUid);
-        if (prof) setFriends((f) => [...f, prof]);
+      setActionLoading(targetUid);
+      try {
+        await sendFriendRequest(user.uid, targetUid, myProfile);
+        // Refresh outgoing requests
+        const outgoing = await getOutgoingRequests(user.uid);
+        setOutgoingRequests(outgoing);
+      } catch (err) {
+        console.error("Failed to send request:", err.message);
       }
+      setActionLoading(null);
     },
     [user, myProfile]
   );
 
-  const isFriend = (uid) => (myProfile?.friends || []).includes(uid);
+  // Accept incoming request
+  const handleAccept = useCallback(
+    async (request) => {
+      if (!user) return;
+      setActionLoading(request.from);
+      try {
+        await acceptFriendRequest(request.id, user.uid, request.from);
+        // Remove from incoming, add to friends
+        setIncomingRequests((prev) => prev.filter((r) => r.id !== request.id));
+        const prof = await getUserProfile(request.from);
+        if (prof) {
+          setFriends((prev) => [...prev, prof]);
+          setMyProfile((p) => ({
+            ...p,
+            friends: [...(p?.friends || []), request.from],
+          }));
+        }
+      } catch (err) {
+        console.error("Failed to accept request:", err);
+      }
+      setActionLoading(null);
+    },
+    [user]
+  );
+
+  // Decline incoming request
+  const handleDecline = useCallback(async (request) => {
+    setActionLoading(request.from);
+    try {
+      await declineFriendRequest(request.id);
+      setIncomingRequests((prev) => prev.filter((r) => r.id !== request.id));
+    } catch (err) {
+      console.error("Failed to decline request:", err);
+    }
+    setActionLoading(null);
+  }, []);
+
+  // Cancel outgoing request
+  const handleCancel = useCallback(async (request) => {
+    setActionLoading(request.to);
+    try {
+      await cancelFriendRequest(request.id);
+      setOutgoingRequests((prev) => prev.filter((r) => r.id !== request.id));
+    } catch (err) {
+      console.error("Failed to cancel request:", err);
+    }
+    setActionLoading(null);
+  }, []);
+
+  // Remove friend
+  const handleRemoveFriend = useCallback(
+    async (friendUid) => {
+      if (!user) return;
+      setActionLoading(friendUid);
+      try {
+        await removeFriend(user.uid, friendUid);
+        setMyProfile((p) => ({
+          ...p,
+          friends: (p?.friends || []).filter((id) => id !== friendUid),
+        }));
+        setFriends((f) => f.filter((fr) => fr.uid !== friendUid));
+      } catch (err) {
+        console.error("Failed to remove friend:", err);
+      }
+      setActionLoading(null);
+    },
+    [user]
+  );
+
+  // Determine relationship status for a given uid
+  const getRelationship = useCallback(
+    (uid) => {
+      if ((myProfile?.friends || []).includes(uid)) return "friends";
+      const outgoing = outgoingRequests.find((r) => r.to === uid);
+      if (outgoing) return "requested";
+      const incoming = incomingRequests.find((r) => r.from === uid);
+      if (incoming) return "incoming";
+      return "none";
+    },
+    [myProfile, outgoingRequests, incomingRequests]
+  );
+
+  // Get the request object for a uid
+  const getRequestFor = useCallback(
+    (uid) => {
+      return (
+        outgoingRequests.find((r) => r.to === uid) ||
+        incomingRequests.find((r) => r.from === uid)
+      );
+    },
+    [outgoingRequests, incomingRequests]
+  );
 
   // Draw chart for viewed user
   const drawChart = useCallback(() => {
@@ -206,9 +320,126 @@ export default function Social({ visible, user, onClose }) {
 
   if (!visible || !user) return null;
 
+  // Render the action button for a user based on relationship
+  const renderActionButton = (uid) => {
+    const rel = getRelationship(uid);
+    const loading = actionLoading === uid;
+    const req = getRequestFor(uid);
+
+    if (loading) {
+      return (
+        <button className="social-action-btn" disabled>
+          ...
+        </button>
+      );
+    }
+
+    switch (rel) {
+      case "friends":
+        return (
+          <button
+            className="social-action-btn is-friend"
+            onClick={() => handleRemoveFriend(uid)}
+          >
+            remove
+          </button>
+        );
+      case "requested":
+        return (
+          <button
+            className="social-action-btn pending"
+            onClick={() => req && handleCancel(req)}
+          >
+            pending
+          </button>
+        );
+      case "incoming":
+        return (
+          <div className="social-action-group">
+            <button
+              className="social-action-btn accept"
+              onClick={() => req && handleAccept(req)}
+            >
+              accept
+            </button>
+            <button
+              className="social-action-btn decline"
+              onClick={() => req && handleDecline(req)}
+            >
+              ✕
+            </button>
+          </div>
+        );
+      default:
+        return (
+          <button
+            className="social-action-btn"
+            onClick={() => handleSendRequest(uid)}
+          >
+            add
+          </button>
+        );
+    }
+  };
+
   // ── Sub-view: Viewing another user's profile ──
   if (viewingUser) {
     const stats = computeStats(viewingTests);
+    const rel = getRelationship(viewingUser.uid);
+    const req = getRequestFor(viewingUser.uid);
+
+    const renderProfileAction = () => {
+      if (actionLoading === viewingUser.uid) {
+        return <button className="social-friend-btn" disabled>...</button>;
+      }
+      switch (rel) {
+        case "friends":
+          return (
+            <button
+              className="social-friend-btn is-friend"
+              onClick={() => handleRemoveFriend(viewingUser.uid)}
+            >
+              remove friend
+            </button>
+          );
+        case "requested":
+          return (
+            <button
+              className="social-friend-btn pending"
+              onClick={() => req && handleCancel(req)}
+            >
+              request sent
+            </button>
+          );
+        case "incoming":
+          return (
+            <div className="social-action-group">
+              <button
+                className="social-friend-btn accept"
+                onClick={() => req && handleAccept(req)}
+              >
+                accept request
+              </button>
+              <button
+                className="social-friend-btn decline"
+                onClick={() => req && handleDecline(req)}
+              >
+                decline
+              </button>
+            </div>
+          );
+        default:
+          return (
+            <button
+              className="social-friend-btn"
+              onClick={() => handleSendRequest(viewingUser.uid)}
+            >
+              send request
+            </button>
+          );
+      }
+    };
+
     return (
       <div className="social-overlay visible">
         <div className="social-container">
@@ -222,12 +453,7 @@ export default function Social({ visible, user, onClose }) {
             >
               back
             </button>
-            <button
-              className={`social-friend-btn ${isFriend(viewingUser.uid) ? "is-friend" : ""}`}
-              onClick={() => handleToggleFriend(viewingUser.uid)}
-            >
-              {isFriend(viewingUser.uid) ? "remove friend" : "add friend"}
-            </button>
+            {renderProfileAction()}
           </div>
 
           {viewingLoading ? (
@@ -324,7 +550,7 @@ export default function Social({ visible, user, onClose }) {
     );
   }
 
-  // ── Main view: Search + Friends ──
+  // ── Main view: Search + Requests + Friends ──
   return (
     <div className="social-overlay visible">
       <div className="social-container">
@@ -354,7 +580,7 @@ export default function Social({ visible, user, onClose }) {
         {searchQuery.length >= 2 && (
           <div className="social-section">
             <h3 className="social-section-title">
-              {searching ? "searching..." : `results`}
+              {searching ? "searching..." : "results"}
             </h3>
             {!searching && searchResults.length === 0 && (
               <div className="social-empty">No users found.</div>
@@ -383,12 +609,62 @@ export default function Social({ visible, user, onClose }) {
                       </span>
                     </div>
                   </div>
-                  <button
-                    className={`social-action-btn ${isFriend(u.uid) ? "is-friend" : ""}`}
-                    onClick={() => handleToggleFriend(u.uid)}
+                  {renderActionButton(u.uid)}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Incoming Friend Requests */}
+        {!loadingRequests && incomingRequests.length > 0 && (
+          <div className="social-section">
+            <h3 className="social-section-title">
+              friend requests ({incomingRequests.length})
+            </h3>
+            <div className="social-user-list">
+              {incomingRequests.map((req) => (
+                <div key={req.id} className="social-user-row">
+                  <div
+                    className="social-user-info"
+                    onClick={async () => {
+                      const prof = await getUserProfile(req.from);
+                      if (prof) handleViewUser(prof);
+                    }}
                   >
-                    {isFriend(u.uid) ? "remove" : "add"}
-                  </button>
+                    {req.fromPhotoURL && (
+                      <img
+                        src={req.fromPhotoURL}
+                        alt=""
+                        className="social-avatar-sm"
+                        referrerPolicy="no-referrer"
+                      />
+                    )}
+                    <div className="social-user-text">
+                      <span className="social-user-row-name">
+                        {req.fromDisplayName || req.fromUsername}
+                      </span>
+                      <span className="social-user-row-handle">
+                        @{req.fromUsername}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="social-action-group">
+                    <button
+                      className="social-action-btn accept"
+                      onClick={() => handleAccept(req)}
+                      disabled={actionLoading === req.from}
+                    >
+                      {actionLoading === req.from ? "..." : "accept"}
+                    </button>
+                    <button
+                      className="social-action-btn decline"
+                      onClick={() => handleDecline(req)}
+                      disabled={actionLoading === req.from}
+                    >
+                      ✕
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

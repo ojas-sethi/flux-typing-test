@@ -137,7 +137,7 @@ export default function App() {
 
       <div className="app">
         <header className={isRunning ? "faded" : ""}>
-          <div className="logo">flux</div>
+          <div className="logo">klacks</div>
           <div className="header-actions">
             <button
               className="theme-toggle"

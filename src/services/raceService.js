@@ -2,7 +2,9 @@ import {
   doc,
   setDoc,
   getDoc,
+  getDocs,
   updateDoc,
+  deleteDoc,
   deleteField,
   collection,
   onSnapshot,
@@ -170,6 +172,29 @@ export async function submitRaceResults(raceId, uid, results) {
   );
 }
 
+// ── Reset Race (back to lobby with new words) ────────────────
+export async function resetRace(raceId, newWords) {
+  const raceRef = doc(db, "races", raceId);
+
+  // Clear all progress docs
+  const progressCol = collection(db, "races", raceId, "progress");
+  const progressSnap = await getDocs(progressCol);
+  const deletePromises = [];
+  progressSnap.forEach((d) => {
+    deletePromises.push(deleteDoc(doc(db, "races", raceId, "progress", d.id)));
+  });
+  await Promise.all(deletePromises);
+
+  // Reset the race document back to waiting
+  await updateDoc(raceRef, {
+    status: "waiting",
+    words: newWords,
+    countdownStartedAt: null,
+    raceStartedAt: null,
+    finishedAt: null,
+  });
+}
+
 // ── Leave Race ────────────────────────────────────────────────
 export async function leaveRace(raceId, uid) {
   const raceRef = doc(db, "races", raceId);
@@ -179,22 +204,36 @@ export async function leaveRace(raceId, uid) {
 }
 
 // ── Listeners ─────────────────────────────────────────────────
-export function onRaceChange(raceId, callback) {
+export function onRaceChange(raceId, callback, onError) {
   const ref = doc(db, "races", raceId);
-  return onSnapshot(ref, (snap) => {
-    if (snap.exists()) {
-      callback({ id: snap.id, ...snap.data() });
+  return onSnapshot(
+    ref,
+    (snap) => {
+      if (snap.exists()) {
+        callback({ id: snap.id, ...snap.data() });
+      }
+    },
+    (err) => {
+      console.error("Race snapshot error:", err);
+      if (onError) onError(err);
     }
-  });
+  );
 }
 
-export function onProgressChange(raceId, callback) {
+export function onProgressChange(raceId, callback, onError) {
   const ref = collection(db, "races", raceId, "progress");
-  return onSnapshot(ref, (snap) => {
-    const progress = {};
-    snap.forEach((doc) => {
-      progress[doc.id] = doc.data();
-    });
-    callback(progress);
-  });
+  return onSnapshot(
+    ref,
+    (snap) => {
+      const progress = {};
+      snap.forEach((doc) => {
+        progress[doc.id] = doc.data();
+      });
+      callback(progress);
+    },
+    (err) => {
+      console.error("Progress snapshot error:", err);
+      if (onError) onError(err);
+    }
+  );
 }

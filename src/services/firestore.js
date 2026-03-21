@@ -151,14 +151,137 @@ export async function searchByUsername(prefix, maxResults = 10) {
   return snap.docs.map((d) => ({ uid: d.id, ...d.data() }));
 }
 
-// ── Friends ──────────────────────────────────────────────────
+// ── Friend Requests ──────────────────────────────────────────
 
-export async function addFriend(myUid, friendUid) {
-  const ref = doc(db, "users", myUid);
-  await updateDoc(ref, {
-    friends: arrayUnion(friendUid),
+export async function sendFriendRequest(fromUid, toUid, fromProfile) {
+  // Check if a request already exists in either direction
+  const existing = await getRequestBetween(fromUid, toUid);
+  if (existing) {
+    if (existing.status === "pending") {
+      throw new Error("Request already sent");
+    }
+  }
+
+  // Check if already friends
+  const myProfile = await getUserProfile(fromUid);
+  if ((myProfile?.friends || []).includes(toUid)) {
+    throw new Error("Already friends");
+  }
+
+  const ref = collection(db, "friendRequests");
+  await addDoc(ref, {
+    from: fromUid,
+    to: toUid,
+    fromUsername: fromProfile?.username || "",
+    fromDisplayName: fromProfile?.displayName || "",
+    fromPhotoURL: fromProfile?.photoURL || "",
+    status: "pending",
+    createdAt: serverTimestamp(),
+  });
+}
+
+export async function getIncomingRequests(uid) {
+  const q = query(
+    collection(db, "friendRequests"),
+    where("to", "==", uid),
+    where("status", "==", "pending")
+  );
+  const snap = await getDocs(q);
+  const results = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  // Sort client-side to avoid composite index requirement
+  results.sort((a, b) => {
+    const aTime = a.createdAt?.seconds || 0;
+    const bTime = b.createdAt?.seconds || 0;
+    return bTime - aTime;
+  });
+  return results;
+}
+
+export async function getOutgoingRequests(uid) {
+  const q = query(
+    collection(db, "friendRequests"),
+    where("from", "==", uid),
+    where("status", "==", "pending")
+  );
+  const snap = await getDocs(q);
+  const results = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  results.sort((a, b) => {
+    const aTime = a.createdAt?.seconds || 0;
+    const bTime = b.createdAt?.seconds || 0;
+    return bTime - aTime;
+  });
+  return results;
+}
+
+async function getRequestBetween(uidA, uidB) {
+  // Query all pending requests involving uidA, then filter client-side
+  const q = query(
+    collection(db, "friendRequests"),
+    where("from", "==", uidA),
+    where("status", "==", "pending")
+  );
+  const snap = await getDocs(q);
+  const match = snap.docs.find((d) => d.data().to === uidB);
+  if (match) return { id: match.id, ...match.data() };
+
+  // Check reverse direction
+  const q2 = query(
+    collection(db, "friendRequests"),
+    where("from", "==", uidB),
+    where("status", "==", "pending")
+  );
+  const snap2 = await getDocs(q2);
+  const match2 = snap2.docs.find((d) => d.data().to === uidA);
+  if (match2) return { id: match2.id, ...match2.data() };
+
+  return null;
+}
+
+export async function acceptFriendRequest(requestId, myUid, otherUid) {
+  // Update request status
+  const reqRef = doc(db, "friendRequests", requestId);
+  await updateDoc(reqRef, { status: "accepted" });
+
+  // Add the other user to MY friends (I can write my own doc)
+  const myRef = doc(db, "users", myUid);
+  await updateDoc(myRef, {
+    friends: arrayUnion(otherUid),
     updatedAt: serverTimestamp(),
   });
+}
+
+export async function declineFriendRequest(requestId) {
+  const reqRef = doc(db, "friendRequests", requestId);
+  await deleteDoc(reqRef);
+}
+
+export async function cancelFriendRequest(requestId) {
+  const reqRef = doc(db, "friendRequests", requestId);
+  await deleteDoc(reqRef);
+}
+
+// Sync: when I open social, check if any of MY outgoing requests were accepted.
+// If so, add those users to my friends and clean up the request docs.
+export async function syncAcceptedRequests(myUid) {
+  const q = query(
+    collection(db, "friendRequests"),
+    where("from", "==", myUid),
+    where("status", "==", "accepted")
+  );
+  const snap = await getDocs(q);
+  if (snap.empty) return;
+
+  const myRef = doc(db, "users", myUid);
+  for (const d of snap.docs) {
+    const data = d.data();
+    // Add the other user to my friends
+    await updateDoc(myRef, {
+      friends: arrayUnion(data.to),
+      updatedAt: serverTimestamp(),
+    });
+    // Clean up the request doc
+    await deleteDoc(doc(db, "friendRequests", d.id));
+  }
 }
 
 export async function removeFriend(myUid, friendUid) {
@@ -171,7 +294,6 @@ export async function removeFriend(myUid, friendUid) {
 
 export async function getFriendProfiles(friendUids) {
   if (!friendUids || !friendUids.length) return [];
-  // Fetch in parallel (Firestore doesn't support 'in' queries for doc refs)
   const profiles = await Promise.all(
     friendUids.map(async (uid) => {
       const prof = await getUserProfile(uid);

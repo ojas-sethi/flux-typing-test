@@ -55,7 +55,7 @@ export default function App() {
       // Auto-save if logged in
       if (user) {
         setSaveStatus("saving");
-        saveTestResult(user.uid, {
+        const saveData = {
           wpm: r.wpm,
           rawWpm: r.rawWpm,
           accuracy: r.accuracy,
@@ -68,9 +68,12 @@ export default function App() {
           mode,
           testType,
           duration: testType === "time" ? duration : r.timeTaken,
-          wordCount: testType === "wordcount" ? wordCountTarget : undefined,
           wpmHistory: r.wpmHistory,
-        })
+        };
+        if (testType === "wordcount") {
+          saveData.wordCount = wordCountTarget;
+        }
+        saveTestResult(user.uid, saveData)
           .then(() => setSaveStatus("saved"))
           .catch(() => setSaveStatus("error"));
       }

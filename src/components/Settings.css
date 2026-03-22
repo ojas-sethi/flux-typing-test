@@ -32,6 +32,18 @@
   flex-shrink: 0;
 }
 
+.settings-group-label {
+  font-family: var(--font-sans);
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  padding: 0 0.2rem;
+  user-select: none;
+  flex-shrink: 0;
+}
+
 .settings button {
   font-family: var(--font-sans);
   font-size: 0.75rem;

@@ -5,14 +5,17 @@ const INITIAL_WORD_COUNT = 200;
 
 export function useTypingTest() {
   const [mode, setMode] = useState("words");
-  const [duration, setDuration] = useState(60);
+  const [testType, setTestType] = useState("time"); // "time" | "wordcount"
+  const [duration, setDuration] = useState(15);
+  const [wordCountTarget, setWordCountTarget] = useState(25);
   const [words, setWords] = useState(() => generateWordList("words", INITIAL_WORD_COUNT));
   const [typedWords, setTypedWords] = useState([]);
   const [currentInput, setCurrentInput] = useState("");
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(60);
+  const [timeLeft, setTimeLeft] = useState(15);
+  const [elapsedTime, setElapsedTime] = useState(0);
   const [wpmHistory, setWpmHistory] = useState([]);
 
   const startTimeRef = useRef(null);
@@ -24,12 +27,16 @@ export function useTypingTest() {
   const typedWordsRef = useRef(typedWords);
   const currentInputRef = useRef(currentInput);
   const currentWordIndexRef = useRef(currentWordIndex);
+  const testTypeRef = useRef(testType);
+  const wordCountTargetRef = useRef(wordCountTarget);
 
   // Keep refs in sync
   wordsRef.current = words;
   typedWordsRef.current = typedWords;
   currentInputRef.current = currentInput;
   currentWordIndexRef.current = currentWordIndex;
+  testTypeRef.current = testType;
+  wordCountTargetRef.current = wordCountTarget;
 
   // Count correct chars (reads from refs, no dependencies that change)
   const countCorrectChars = useCallback(() => {
@@ -67,32 +74,58 @@ export function useTypingTest() {
     });
   }, []);
 
-  // Timer tick effect — only depends on isRunning and duration (both stable during a test)
+  // Timer tick effect
   useEffect(() => {
     if (!isRunning) return;
 
     timerRef.current = setInterval(() => {
       const elapsed = (Date.now() - startTimeRef.current) / 1000;
-      const remaining = Math.max(0, duration - Math.floor(elapsed));
-      setTimeLeft(remaining);
 
-      const currentSecond = Math.floor(elapsed);
-      if (currentSecond > lastRecordedSecond.current && currentSecond <= duration) {
-        const correctChars = countCorrectChars();
-        const wpm = elapsed > 0 ? Math.round((correctChars / 5) / (elapsed / 60)) : 0;
-        setWpmHistory((prev) => [...prev, { second: currentSecond, wpm }]);
-        lastRecordedSecond.current = currentSecond;
-      }
+      if (testTypeRef.current === "time") {
+        // Countdown mode
+        const remaining = Math.max(0, duration - Math.floor(elapsed));
+        setTimeLeft(remaining);
 
-      if (remaining <= 0) {
-        clearInterval(timerRef.current);
-        setIsRunning(false);
-        setIsFinished(true);
+        const currentSecond = Math.floor(elapsed);
+        if (currentSecond > lastRecordedSecond.current && currentSecond <= duration) {
+          const correctChars = countCorrectChars();
+          const wpm = elapsed > 0 ? Math.round((correctChars / 5) / (elapsed / 60)) : 0;
+          setWpmHistory((prev) => [...prev, { second: currentSecond, wpm }]);
+          lastRecordedSecond.current = currentSecond;
+        }
+
+        if (remaining <= 0) {
+          clearInterval(timerRef.current);
+          setIsRunning(false);
+          setIsFinished(true);
+        }
+      } else {
+        // Word count mode — count up
+        setElapsedTime(Math.floor(elapsed));
+
+        const currentSecond = Math.floor(elapsed);
+        if (currentSecond > lastRecordedSecond.current) {
+          const correctChars = countCorrectChars();
+          const wpm = elapsed > 0 ? Math.round((correctChars / 5) / (elapsed / 60)) : 0;
+          setWpmHistory((prev) => [...prev, { second: currentSecond, wpm }]);
+          lastRecordedSecond.current = currentSecond;
+        }
       }
     }, 100);
 
     return () => clearInterval(timerRef.current);
   }, [isRunning, duration, countCorrectChars]);
+
+  // Check word count completion
+  const checkWordCountFinish = useCallback((completedIndex) => {
+    if (testTypeRef.current === "wordcount" && completedIndex >= wordCountTargetRef.current) {
+      clearInterval(timerRef.current);
+      const elapsed = (Date.now() - startTimeRef.current) / 1000;
+      setElapsedTime(elapsed);
+      setIsRunning(false);
+      setIsFinished(true);
+    }
+  }, []);
 
   // Handle character input
   const handleInput = useCallback(
@@ -113,10 +146,14 @@ export function useTypingTest() {
             next[idx] = input;
             return next;
           });
-          setCurrentWordIndex((prev) => prev + 1);
+          const newIndex = idx + 1;
+          setCurrentWordIndex(newIndex);
           setCurrentInput("");
 
-          if (idx + 1 >= wordsRef.current.length - 20) {
+          // Check if word count target reached
+          checkWordCountFinish(newIndex);
+
+          if (newIndex >= wordsRef.current.length - 20) {
             setWords((prev) => [
               ...prev,
               ...generateWordList(mode, INITIAL_WORD_COUNT),
@@ -128,7 +165,7 @@ export function useTypingTest() {
 
       setCurrentInput(value);
     },
-    [isFinished, isRunning, startTimer, mode]
+    [isFinished, isRunning, startTimer, mode, checkWordCountFinish]
   );
 
   // Handle backspace to previous word
@@ -163,13 +200,18 @@ export function useTypingTest() {
     let missedChars = 0;
     let totalTyped = 0;
 
-    for (let i = 0; i <= cwi && i < w.length; i++) {
+    // In word count mode, only count up to the target words
+    const maxIndex = testTypeRef.current === "wordcount"
+      ? Math.min(cwi, wordCountTargetRef.current)
+      : cwi;
+
+    for (let i = 0; i <= maxIndex && i < w.length; i++) {
       const word = w[i];
-      const typed = i < cwi ? tw[i] : ci;
-      if (!typed && i === cwi) continue;
+      const typed = i < maxIndex ? tw[i] : ci;
+      if (!typed && i === maxIndex) continue;
       if (!typed) continue;
 
-      const isCompleted = i < cwi;
+      const isCompleted = i < maxIndex;
 
       for (let j = 0; j < word.length; j++) {
         if (j < typed.length) {
@@ -196,9 +238,13 @@ export function useTypingTest() {
       }
     }
 
-    const minutes = duration / 60;
-    const wpm = Math.round((correctChars / 5) / minutes);
-    const rawWpm = Math.round((totalTyped / 5) / minutes);
+    // Calculate actual time used
+    const actualTime = testTypeRef.current === "wordcount"
+      ? (startTimeRef.current ? (Date.now() - startTimeRef.current) / 1000 : 0)
+      : duration;
+    const minutes = actualTime / 60;
+    const wpm = minutes > 0 ? Math.round((correctChars / 5) / minutes) : 0;
+    const rawWpm = minutes > 0 ? Math.round((totalTyped / 5) / minutes) : 0;
     const accuracy =
       totalTyped > 0 ? Math.round((correctChars / totalTyped) * 100) : 0;
 
@@ -224,68 +270,66 @@ export function useTypingTest() {
       missedChars,
       totalChars: correctChars + incorrectChars + extraChars,
       wpmHistory,
+      timeTaken: Math.round(actualTime * 10) / 10,
     };
   }, [duration, wpmHistory]);
 
-  // Reset
-  const reset = useCallback(() => {
+  // Full reset helper
+  const fullReset = useCallback((newMode, newTestType, newDuration, newWordCountTarget) => {
     clearInterval(timerRef.current);
-    const newWords = generateWordList(mode, INITIAL_WORD_COUNT);
+    const newWords = generateWordList(newMode, INITIAL_WORD_COUNT);
     setWords(newWords);
     setTypedWords([]);
     setCurrentInput("");
     setCurrentWordIndex(0);
     setIsRunning(false);
     setIsFinished(false);
-    setTimeLeft(duration);
+    setTimeLeft(newTestType === "time" ? newDuration : 0);
+    setElapsedTime(0);
     setWpmHistory([]);
     startTimeRef.current = null;
     lastRecordedSecond.current = 0;
-  }, [mode, duration]);
+  }, []);
 
-  // Change mode
+  // Reset
+  const reset = useCallback(() => {
+    fullReset(mode, testType, duration, wordCountTarget);
+  }, [mode, testType, duration, wordCountTarget, fullReset]);
+
+  // Change mode (words/sentences)
   const changeMode = useCallback(
     (newMode) => {
       setMode(newMode);
-      clearInterval(timerRef.current);
-      const newWords = generateWordList(newMode, INITIAL_WORD_COUNT);
-      setWords(newWords);
-      setTypedWords([]);
-      setCurrentInput("");
-      setCurrentWordIndex(0);
-      setIsRunning(false);
-      setIsFinished(false);
-      setTimeLeft(duration);
-      setWpmHistory([]);
-      startTimeRef.current = null;
-      lastRecordedSecond.current = 0;
+      fullReset(newMode, testType, duration, wordCountTarget);
     },
-    [duration]
+    [testType, duration, wordCountTarget, fullReset]
   );
 
-  // Change duration
+  // Change duration (time mode)
   const changeDuration = useCallback(
     (newDuration) => {
+      setTestType("time");
       setDuration(newDuration);
-      clearInterval(timerRef.current);
-      const newWords = generateWordList(mode, INITIAL_WORD_COUNT);
-      setWords(newWords);
-      setTypedWords([]);
-      setCurrentInput("");
-      setCurrentWordIndex(0);
-      setIsRunning(false);
-      setIsFinished(false);
-      setTimeLeft(newDuration);
-      setWpmHistory([]);
-      startTimeRef.current = null;
-      lastRecordedSecond.current = 0;
+      fullReset(mode, "time", newDuration, wordCountTarget);
     },
-    [mode]
+    [mode, wordCountTarget, fullReset]
+  );
+
+  // Change word count target
+  const changeWordCount = useCallback(
+    (newCount) => {
+      setTestType("wordcount");
+      setWordCountTarget(newCount);
+      fullReset(mode, "wordcount", duration, newCount);
+    },
+    [mode, duration, fullReset]
   );
 
   return {
     mode,
+    testType,
     duration,
+    wordCountTarget,
     words,
     typedWords,
     currentInput,
@@ -293,12 +337,14 @@ export function useTypingTest() {
     isRunning,
     isFinished,
     timeLeft,
+    elapsedTime,
     handleInput,
     goToPrevWord,
     clearCurrentWord,
     reset,
     changeMode,
     changeDuration,
+    changeWordCount,
     getResults,
   };
 }

@@ -6,8 +6,18 @@ const MODES = [
 ];
 
 const DURATIONS = [15, 30, 60, 120];
+const WORD_COUNTS = [10, 25, 50, 100];
 
-export default function Settings({ mode, duration, onModeChange, onDurationChange, faded }) {
+export default function Settings({
+  mode,
+  testType,
+  duration,
+  wordCountTarget,
+  onModeChange,
+  onDurationChange,
+  onWordCountChange,
+  faded,
+}) {
   return (
     <div className={`settings ${faded ? "faded" : ""}`}>
       {MODES.map((m) => (
@@ -21,14 +31,27 @@ export default function Settings({ mode, duration, onModeChange, onDurationChang
         </button>
       ))}
       <span className="divider" />
+      <span className="settings-group-label">time</span>
       {DURATIONS.map((d) => (
         <button
-          key={d}
-          className={duration === d ? "active" : ""}
+          key={`t${d}`}
+          className={testType === "time" && duration === d ? "active" : ""}
           onClick={() => onDurationChange(d)}
           tabIndex={-1}
         >
           {d}s
+        </button>
+      ))}
+      <span className="divider" />
+      <span className="settings-group-label">words</span>
+      {WORD_COUNTS.map((c) => (
+        <button
+          key={`w${c}`}
+          className={testType === "wordcount" && wordCountTarget === c ? "active" : ""}
+          onClick={() => onWordCountChange(c)}
+          tabIndex={-1}
+        >
+          {c}
         </button>
       ))}
     </div>

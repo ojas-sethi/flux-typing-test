@@ -17,7 +17,9 @@ export default function App() {
   const { user, profile, loading: authLoading, needsUsername, signIn, signOut, refreshProfile } = useAuth();
   const {
     mode,
+    testType,
     duration,
+    wordCountTarget,
     words,
     typedWords,
     currentInput,
@@ -25,12 +27,14 @@ export default function App() {
     isRunning,
     isFinished,
     timeLeft,
+    elapsedTime,
     handleInput,
     goToPrevWord,
     clearCurrentWord,
     reset,
     changeMode,
     changeDuration,
+    changeWordCount,
     getResults,
   } = useTypingTest();
 
@@ -62,7 +66,9 @@ export default function App() {
           extraChars: r.extraChars,
           missedChars: r.missedChars,
           mode,
-          duration,
+          testType,
+          duration: testType === "time" ? duration : r.timeTaken,
+          wordCount: testType === "wordcount" ? wordCountTarget : undefined,
           wpmHistory: r.wpmHistory,
         })
           .then(() => setSaveStatus("saved"))
@@ -73,7 +79,7 @@ export default function App() {
       didComputeResults.current = false;
       setSaveStatus(null);
     }
-  }, [isFinished, getResults, user, mode, duration]);
+  }, [isFinished, getResults, user, mode, testType, duration, wordCountTarget]);
 
   // Restart handler
   const handleRestart = useCallback(() => {
@@ -121,7 +127,13 @@ export default function App() {
     };
   }, []);
 
-  const progress = isRunning ? (timeLeft / duration) * 100 : 100;
+  const progress = isRunning
+    ? testType === "time"
+      ? (timeLeft / duration) * 100
+      : (currentWordIndex / wordCountTarget) * 100
+    : testType === "time"
+      ? 100
+      : 0;
 
   const handleSignOut = useCallback(() => {
     signOut();
@@ -198,7 +210,9 @@ export default function App() {
 
         <main className="main-content">
           <div className={`timer-display ${isRunning ? "visible" : ""}`}>
-            {timeLeft}
+            {testType === "time"
+              ? timeLeft
+              : `${Math.min(currentWordIndex, wordCountTarget)}/${wordCountTarget}`}
           </div>
 
           <div className="typing-card">
@@ -225,9 +239,12 @@ export default function App() {
       {/* Floating dock settings */}
       <Settings
         mode={mode}
+        testType={testType}
         duration={duration}
+        wordCountTarget={wordCountTarget}
         onModeChange={changeMode}
         onDurationChange={changeDuration}
+        onWordCountChange={changeWordCount}
         faded={isRunning}
       />
 

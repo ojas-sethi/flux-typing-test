@@ -125,18 +125,21 @@ export default function Profile({ visible, user, onClose, onSignOut, onOpenSocia
       setLoading(true);
       Promise.all([
         getUserProfile(user.uid),
-        getTestHistory(user.uid, 50),
-        getRaceHistory(user.uid, 50),
+        getTestHistory(user.uid, 50).catch(() => []),
+        getRaceHistory(user.uid, 50).catch(() => []),
       ])
         .then(([prof, hist, raceHist]) => {
           setProfile(prof);
-          setTests(hist);
-          setRaces(raceHist);
+          setTests(hist || []);
+          setRaces(raceHist || []);
           setNameValue(prof?.displayName || user.displayName || "");
           setBioValue(prof?.bio || "");
           setLoading(false);
         })
-        .catch(() => setLoading(false));
+        .catch((err) => {
+          console.error("Failed to load profile:", err);
+          setLoading(false);
+        });
     }
   }, [visible, user]);
 

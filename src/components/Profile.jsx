@@ -3,6 +3,7 @@ import {
   getUserProfile,
   updateUserProfile,
   getTestHistory,
+  getRaceHistory,
   checkUsernameAvailable,
   changeUsername,
   canChangeUsername,
@@ -33,21 +34,28 @@ function timeAgo(timestamp) {
   return new Date(seconds * 1000).toLocaleDateString();
 }
 
-function computeStats(tests) {
-  if (!tests.length) return null;
+function getTimestamp(item) {
+  if (!item.completedAt) return 0;
+  if (typeof item.completedAt.seconds === "number") return item.completedAt.seconds;
+  return Math.floor(item.completedAt / 1000);
+}
 
-  const totalTests = tests.length;
-  const bestWpm = Math.max(...tests.map((t) => t.wpm));
+function computeStats(tests, races, includeRaces) {
+  const items = includeRaces ? [...tests, ...races] : tests;
+  if (!items.length) return null;
+
+  const totalTests = items.length;
+  const bestWpm = Math.max(...items.map((t) => t.wpm));
   const avgWpm = Math.round(
-    tests.reduce((s, t) => s + t.wpm, 0) / totalTests
+    items.reduce((s, t) => s + t.wpm, 0) / totalTests
   );
   const avgAccuracy = Math.round(
-    tests.reduce((s, t) => s + t.accuracy, 0) / totalTests
+    items.reduce((s, t) => s + t.accuracy, 0) / totalTests
   );
-  const totalTime = tests.reduce((s, t) => s + (t.duration || 0), 0);
+  const totalTime = items.reduce((s, t) => s + (t.duration || 0), 0);
 
-  const wordTests = tests.filter((t) => t.mode === "words");
-  const sentenceTests = tests.filter((t) => t.mode === "sentences");
+  const wordTests = items.filter((t) => t.mode === "words");
+  const sentenceTests = items.filter((t) => t.mode === "sentences");
   const avgWpmWords = wordTests.length
     ? Math.round(wordTests.reduce((s, t) => s + t.wpm, 0) / wordTests.length)
     : null;
@@ -57,7 +65,7 @@ function computeStats(tests) {
       )
     : null;
 
-  // Recent trend
+  // Recent trend (use only solo tests for trend)
   const recent10 = tests.slice(0, 10);
   const prev10 = tests.slice(10, 20);
   const recentAvg = recent10.length
@@ -80,9 +88,21 @@ function computeStats(tests) {
   };
 }
 
+function computeRaceStats(races) {
+  if (!races.length) return null;
+  const completed = races.length;
+  const won = races.filter((r) => r.won).length;
+  const winRate = completed > 0 ? Math.round((won / completed) * 100) : 0;
+  const bestWpm = Math.max(...races.map((r) => r.wpm));
+  const avgWpm = Math.round(races.reduce((s, r) => s + r.wpm, 0) / completed);
+  return { completed, won, winRate, bestWpm, avgWpm };
+}
+
 export default function Profile({ visible, user, onClose, onSignOut, onOpenSocial }) {
   const [profile, setProfile] = useState(null);
   const [tests, setTests] = useState([]);
+  const [races, setRaces] = useState([]);
+  const [includeRaces, setIncludeRaces] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [editingBio, setEditingBio] = useState(false);
   const [editingUsername, setEditingUsername] = useState(false);
@@ -103,10 +123,15 @@ export default function Profile({ visible, user, onClose, onSignOut, onOpenSocia
   useEffect(() => {
     if (visible && user) {
       setLoading(true);
-      Promise.all([getUserProfile(user.uid), getTestHistory(user.uid, 50)])
-        .then(([prof, hist]) => {
+      Promise.all([
+        getUserProfile(user.uid),
+        getTestHistory(user.uid, 50),
+        getRaceHistory(user.uid, 50),
+      ])
+        .then(([prof, hist, raceHist]) => {
           setProfile(prof);
           setTests(hist);
+          setRaces(raceHist);
           setNameValue(prof?.displayName || user.displayName || "");
           setBioValue(prof?.bio || "");
           setLoading(false);
@@ -324,8 +349,14 @@ export default function Profile({ visible, user, onClose, onSignOut, onOpenSocia
 
   if (!user) return null;
 
-  const stats = computeStats(tests);
+  const stats = computeStats(tests, races, includeRaces);
+  const raceStats = computeRaceStats(races);
   const photoURL = user.photoURL;
+
+  // Combine tests and races for recent items, sorted by date, limited to 10
+  const recentItems = [...tests.map((t) => ({ ...t, _type: "test" })), ...races.map((r) => ({ ...r, _type: "race" }))]
+    .sort((a, b) => getTimestamp(b) - getTimestamp(a))
+    .slice(0, 10);
 
   return (
     <div className={`profile-overlay ${visible ? "visible" : ""}`}>
@@ -466,6 +497,21 @@ export default function Profile({ visible, user, onClose, onSignOut, onOpenSocia
               </button>
             )}
 
+            {/* Include Races Toggle */}
+            {races.length > 0 && (
+              <div className="profile-toggle-row">
+                <span className="profile-toggle-label">include races in stats</span>
+                <button
+                  className={`profile-toggle ${includeRaces ? "active" : ""}`}
+                  onClick={() => setIncludeRaces((v) => !v)}
+                  role="switch"
+                  aria-checked={includeRaces}
+                >
+                  <span className="profile-toggle-knob" />
+                </button>
+              </div>
+            )}
+
             {/* Stats */}
             {stats ? (
               <>
@@ -534,6 +580,35 @@ export default function Profile({ visible, user, onClose, onSignOut, onOpenSocia
                   </div>
                 )}
 
+                {/* Race Stats */}
+                {raceStats && (
+                  <div className="profile-section">
+                    <h3 className="profile-section-title">race stats</h3>
+                    <div className="profile-race-stats-grid">
+                      <div className="profile-race-stat">
+                        <span className="profile-race-stat-value">{raceStats.completed}</span>
+                        <span className="profile-race-stat-label">races</span>
+                      </div>
+                      <div className="profile-race-stat">
+                        <span className="profile-race-stat-value">{raceStats.won}</span>
+                        <span className="profile-race-stat-label">won</span>
+                      </div>
+                      <div className="profile-race-stat">
+                        <span className="profile-race-stat-value">{raceStats.winRate}<small>%</small></span>
+                        <span className="profile-race-stat-label">win rate</span>
+                      </div>
+                      <div className="profile-race-stat">
+                        <span className="profile-race-stat-value">{raceStats.bestWpm}</span>
+                        <span className="profile-race-stat-label">best wpm</span>
+                      </div>
+                      <div className="profile-race-stat">
+                        <span className="profile-race-stat-value">{raceStats.avgWpm}</span>
+                        <span className="profile-race-stat-label">avg wpm</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* WPM Chart */}
                 {tests.length >= 2 && (
                   <div className="profile-section">
@@ -548,20 +623,29 @@ export default function Profile({ visible, user, onClose, onSignOut, onOpenSocia
                 <div className="profile-section">
                   <h3 className="profile-section-title">recent tests</h3>
                   <div className="profile-tests">
-                    {tests.slice(0, 15).map((test) => (
-                      <div key={test.id} className="profile-test-row">
+                    {recentItems.map((item) => (
+                      <div key={item.id} className="profile-test-row">
                         <span className="test-wpm">
-                          {test.wpm}
+                          {item.wpm}
                           <small> wpm</small>
                         </span>
                         <span className="test-accuracy">
-                          {test.accuracy}%
+                          {item.accuracy}%
                         </span>
                         <span className="test-meta">
-                          {test.mode} / {test.duration}s
+                          {item._type === "race" ? (
+                            <>
+                              <span className="test-badge">race</span>
+                              {" "}{item.mode}
+                            </>
+                          ) : (
+                            <>
+                              {item.mode} / {item.duration}s
+                            </>
+                          )}
                         </span>
                         <span className="test-time">
-                          {timeAgo(test.completedAt)}
+                          {timeAgo(item.completedAt)}
                         </span>
                       </div>
                     ))}

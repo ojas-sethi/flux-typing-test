@@ -5,8 +5,12 @@ import { useState, useCallback, useRef, useEffect } from "react";
  * Accepts an external word list and duration (from the race document).
  * Does NOT generate words or allow mode/duration changes.
  * Exposes live progress (currentWordIndex, live WPM) for reporting.
+ *
+ * Supports two test types:
+ * - "time": countdown timer, test ends when time runs out
+ * - "wordcount": count-up timer, test ends when enough words are typed
  */
-export function useRaceTypingTest(raceWords, raceDuration) {
+export function useRaceTypingTest(raceWords, raceDuration, raceTestType = "time", raceWordCount = 25) {
   const [words, setWords] = useState(raceWords || []);
   const [typedWords, setTypedWords] = useState([]);
   const [currentInput, setCurrentInput] = useState("");
@@ -14,6 +18,7 @@ export function useRaceTypingTest(raceWords, raceDuration) {
   const [isRunning, setIsRunning] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
   const [timeLeft, setTimeLeft] = useState(raceDuration || 30);
+  const [elapsedTime, setElapsedTime] = useState(0);
   const [wpmHistory, setWpmHistory] = useState([]);
   const [liveWpm, setLiveWpm] = useState(0);
 
@@ -85,12 +90,21 @@ export function useRaceTypingTest(raceWords, raceDuration) {
 
     timerRef.current = setInterval(() => {
       const elapsed = (Date.now() - startTimeRef.current) / 1000;
-      const dur = raceDuration || 30;
-      const remaining = Math.max(0, dur - Math.floor(elapsed));
-      setTimeLeft(remaining);
+
+      if (raceTestType === "wordcount") {
+        // Count up mode
+        setElapsedTime(Math.floor(elapsed));
+        setTimeLeft(Math.floor(elapsed)); // display elapsed time
+      } else {
+        // Count down mode
+        const dur = raceDuration || 30;
+        const remaining = Math.max(0, dur - Math.floor(elapsed));
+        setTimeLeft(remaining);
+      }
 
       const currentSecond = Math.floor(elapsed);
-      if (currentSecond > lastRecordedSecond.current && currentSecond <= dur) {
+      const maxSecond = raceTestType === "wordcount" ? Infinity : (raceDuration || 30);
+      if (currentSecond > lastRecordedSecond.current && currentSecond <= maxSecond) {
         const correctChars = countCorrectChars();
         const wpm = elapsed > 0 ? Math.round((correctChars / 5) / (elapsed / 60)) : 0;
         setWpmHistory((prev) => [...prev, { second: currentSecond, wpm }]);
@@ -98,16 +112,35 @@ export function useRaceTypingTest(raceWords, raceDuration) {
         lastRecordedSecond.current = currentSecond;
       }
 
-      if (remaining <= 0) {
-        clearInterval(timerRef.current);
-        canTypeRef.current = false;
-        setIsRunning(false);
-        setIsFinished(true);
+      // Time mode: end when time runs out
+      if (raceTestType !== "wordcount") {
+        const dur = raceDuration || 30;
+        const remaining = Math.max(0, dur - Math.floor(elapsed));
+        if (remaining <= 0) {
+          clearInterval(timerRef.current);
+          canTypeRef.current = false;
+          setIsRunning(false);
+          setIsFinished(true);
+        }
       }
     }, 100);
 
     return () => clearInterval(timerRef.current);
-  }, [isRunning, raceDuration, countCorrectChars]);
+  }, [isRunning, raceDuration, raceTestType, countCorrectChars]);
+
+  // Word count mode: check if we've typed enough words
+  useEffect(() => {
+    if (raceTestType === "wordcount" && isRunning && currentWordIndex >= raceWordCount) {
+      clearInterval(timerRef.current);
+      canTypeRef.current = false;
+      setIsRunning(false);
+      setIsFinished(true);
+      // Capture final elapsed time
+      if (startTimeRef.current) {
+        setElapsedTime(Math.round((Date.now() - startTimeRef.current) / 1000 * 10) / 10);
+      }
+    }
+  }, [currentWordIndex, raceTestType, raceWordCount, isRunning]);
 
   const handleInput = useCallback(
     (value) => {
@@ -155,7 +188,14 @@ export function useRaceTypingTest(raceWords, raceDuration) {
     const w = wordsRef.current;
     const ci = currentInputRef.current;
     const cwi = currentWordIndexRef.current;
-    const dur = raceDuration || 30;
+
+    // For word count mode, use actual elapsed time; for time mode, use duration
+    let dur;
+    if (raceTestType === "wordcount") {
+      dur = startTimeRef.current ? (Date.now() - startTimeRef.current) / 1000 : 1;
+    } else {
+      dur = raceDuration || 30;
+    }
 
     let correctChars = 0;
     let incorrectChars = 0;
@@ -220,14 +260,16 @@ export function useRaceTypingTest(raceWords, raceDuration) {
       totalChars: correctChars + incorrectChars + extraChars,
       wpmHistory,
       wordsTyped: cwi,
+      elapsedTime: Math.round(dur * 10) / 10,
     };
-  }, [raceDuration, wpmHistory]);
+  }, [raceDuration, raceTestType, wpmHistory]);
 
   // Allow race to enable typing AND start the timer (after countdown)
   const enableTyping = useCallback(() => {
     canTypeRef.current = true;
     startTimeRef.current = Date.now();
     lastRecordedSecond.current = 0;
+    setElapsedTime(0);
     setIsRunning(true);
   }, []);
 
@@ -238,13 +280,14 @@ export function useRaceTypingTest(raceWords, raceDuration) {
     setCurrentWordIndex(0);
     setIsRunning(false);
     setIsFinished(false);
-    setTimeLeft(raceDuration || 30);
+    setTimeLeft(raceTestType === "wordcount" ? 0 : (raceDuration || 30));
+    setElapsedTime(0);
     setWpmHistory([]);
     setLiveWpm(0);
     startTimeRef.current = null;
     lastRecordedSecond.current = 0;
     canTypeRef.current = false;
-  }, [raceDuration]);
+  }, [raceDuration, raceTestType]);
 
   // Compute live accuracy
   const correctChars = countCorrectChars();
@@ -259,6 +302,7 @@ export function useRaceTypingTest(raceWords, raceDuration) {
     isRunning,
     isFinished,
     timeLeft,
+    elapsedTime,
     liveWpm,
     liveAccuracy,
     handleInput,

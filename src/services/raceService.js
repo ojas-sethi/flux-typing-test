@@ -25,7 +25,7 @@ function generateCode(len = 6) {
 }
 
 // ── Create Race ───────────────────────────────────────────────
-export async function createRace(hostUid, hostProfile, mode, duration, words) {
+export async function createRace(hostUid, hostProfile, mode, duration, words, testType = "time", wordCount = 25) {
   const code = generateCode();
   const raceId = `${code}_${Date.now()}`;
   const raceRef = doc(db, "races", raceId);
@@ -48,6 +48,8 @@ export async function createRace(hostUid, hostProfile, mode, duration, words) {
       mode,
       duration,
       words,
+      testType,
+      wordCount,
       participants: {
         [hostUid]: {
           displayName: hostProfile.displayName || "",

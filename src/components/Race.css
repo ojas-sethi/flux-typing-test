@@ -469,19 +469,17 @@
 
 .race-track-fill {
   height: 100%;
-  background: var(--accent);
+  background: var(--text-muted);
   border-radius: 3px;
   transition: width 0.4s ease;
-  box-shadow: 0 0 8px var(--accent-glow);
 }
 
 .race-track.is-self .race-track-fill {
-  background: var(--accent);
+  background: var(--text-secondary);
 }
 
 .race-track:not(.is-self) .race-track-fill {
-  background: var(--text-secondary);
-  box-shadow: none;
+  background: var(--text-muted);
 }
 
 .race-track.finished .race-track-name {
@@ -626,6 +624,61 @@
   font-family: var(--font-sans);
   font-size: 0.72rem;
   color: var(--text-secondary);
+}
+
+/* ── Session Stats ────────────────────────────────────────── */
+.race-session-stats {
+  width: 100%;
+  max-width: 480px;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.race-session-title {
+  font-family: var(--font-sans);
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-secondary);
+  margin-bottom: 0.75rem;
+  text-align: center;
+}
+
+.race-session-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+
+.race-session-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.65rem 0.4rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.race-session-stat-value {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.race-session-stat-label {
+  font-family: var(--font-sans);
+  font-size: 0.55rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  text-align: center;
 }
 
 /* ── Responsive ───────────────────────────────────────────── */

@@ -624,7 +624,7 @@ export default function Profile({ visible, user, onClose, onSignOut, onOpenSocia
 
                 {/* Recent Tests */}
                 <div className="profile-section">
-                  <h3 className="profile-section-title">recent tests</h3>
+                  <h3 className="profile-section-title">recent tests (last 10)</h3>
                   <div className="profile-tests">
                     {recentItems.map((item) => (
                       <div key={item.id} className="profile-test-row">
@@ -636,16 +636,12 @@ export default function Profile({ visible, user, onClose, onSignOut, onOpenSocia
                           {item.accuracy}%
                         </span>
                         <span className="test-meta">
-                          {item._type === "race" ? (
-                            <>
-                              <span className="test-badge">race</span>
-                              {" "}{item.mode}
-                            </>
-                          ) : (
-                            <>
-                              {item.mode} / {item.duration}s
-                            </>
+                          {item._type === "race" && (
+                            <span className="test-badge">race</span>
                           )}
+                          {item.mode} / {item.testType === "wordcount"
+                            ? `${item.wordCount}w`
+                            : `${Math.round(item.duration)}s`}
                         </span>
                         <span className="test-time">
                           {timeAgo(item.completedAt)}

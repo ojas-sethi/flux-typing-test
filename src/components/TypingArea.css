@@ -45,7 +45,8 @@
 
 .words {
   position: relative;
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+  will-change: transform;
 }
 
 .word {
@@ -94,8 +95,9 @@
   top: 0;
   left: 0;
   z-index: 10;
-  transition: left 0.08s cubic-bezier(0.16, 1, 0.3, 1),
-              top 0.12s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: left 0.1s cubic-bezier(0.25, 1, 0.5, 1),
+              top 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+  will-change: left, top;
   box-shadow: 0 0 10px var(--accent-glow),
               0 0 3px var(--accent-glow);
 }

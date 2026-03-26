@@ -426,6 +426,48 @@
   border: 1px solid rgba(244, 63, 94, 0.12);
 }
 
+/* ── Last 10 Average ─────────────────────────────────────── */
+.profile-recent-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+}
+
+.profile-recent-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.75rem 0.4rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.profile-recent-stat-value {
+  font-family: var(--font-mono);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.profile-recent-stat-value small {
+  font-size: 0.6rem;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+.profile-recent-stat-label {
+  font-family: var(--font-sans);
+  font-size: 0.55rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
 /* ── Mode Breakdown ───────────────────────────────────────── */
 .profile-modes {
   display: flex;
@@ -620,6 +662,9 @@
   }
   .profile-stats-grid {
     grid-template-columns: repeat(3, 1fr);
+  }
+  .profile-recent-stats {
+    grid-template-columns: repeat(2, 1fr);
   }
   .profile-test-row {
     grid-template-columns: 1fr 0.6fr 1fr;

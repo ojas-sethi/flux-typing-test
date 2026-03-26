@@ -88,6 +88,38 @@ function computeStats(tests, races, includeRaces) {
   };
 }
 
+function computeRecentStats(tests, races) {
+  // Combine and sort by date, take last 10
+  const all = [
+    ...tests.map((t) => ({ ...t, _type: "test" })),
+    ...races.map((r) => ({ ...r, _type: "race" })),
+  ];
+  all.sort((a, b) => getTimestamp(b) - getTimestamp(a));
+  const recent = all.slice(0, 10);
+  if (!recent.length) return null;
+
+  const count = recent.length;
+  const avgWpm = Math.round(recent.reduce((s, t) => s + t.wpm, 0) / count);
+  const bestWpm = Math.max(...recent.map((t) => t.wpm));
+  const avgAccuracy = Math.round(
+    recent.reduce((s, t) => s + t.accuracy, 0) / count
+  );
+  const avgConsistency = recent.filter((t) => t.consistency != null).length
+    ? Math.round(
+        recent
+          .filter((t) => t.consistency != null)
+          .reduce((s, t) => s + t.consistency, 0) /
+          recent.filter((t) => t.consistency != null).length
+      )
+    : null;
+  const totalChars = recent.reduce(
+    (s, t) => s + (t.correctChars || 0) + (t.incorrectChars || 0) + (t.extraChars || 0) + (t.missedChars || 0),
+    0
+  );
+
+  return { count, avgWpm, bestWpm, avgAccuracy, avgConsistency, totalChars };
+}
+
 function computeRaceStats(races) {
   if (!races.length) return null;
   const completed = races.length;
@@ -354,6 +386,7 @@ export default function Profile({ visible, user, onClose, onSignOut, onOpenSocia
 
   const stats = computeStats(tests, races, includeRaces);
   const raceStats = computeRaceStats(races);
+  const recentStats = computeRecentStats(tests, races);
   const photoURL = user.photoURL;
 
   // Combine tests and races for recent items, sorted by date, limited to 10
@@ -553,6 +586,33 @@ export default function Profile({ visible, user, onClose, onSignOut, onOpenSocia
                   >
                     {stats.trend > 0 ? "+" : ""}
                     {stats.trend} wpm vs your previous 10 tests
+                  </div>
+                )}
+
+                {/* Last 10 Average */}
+                {recentStats && (
+                  <div className="profile-section">
+                    <h3 className="profile-section-title">last 10 tests average</h3>
+                    <div className="profile-recent-stats">
+                      <div className="profile-recent-stat">
+                        <span className="profile-recent-stat-value">{recentStats.avgWpm}</span>
+                        <span className="profile-recent-stat-label">avg wpm</span>
+                      </div>
+                      <div className="profile-recent-stat">
+                        <span className="profile-recent-stat-value">{recentStats.bestWpm}</span>
+                        <span className="profile-recent-stat-label">best wpm</span>
+                      </div>
+                      <div className="profile-recent-stat">
+                        <span className="profile-recent-stat-value">{recentStats.avgAccuracy}<small>%</small></span>
+                        <span className="profile-recent-stat-label">accuracy</span>
+                      </div>
+                      {recentStats.avgConsistency !== null && (
+                        <div className="profile-recent-stat">
+                          <span className="profile-recent-stat-value">{recentStats.avgConsistency}<small>%</small></span>
+                          <span className="profile-recent-stat-label">consistency</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 

@@ -579,6 +579,36 @@ export default function Profile({ visible, user, onClose, onSignOut, onOpenSocia
                   </div>
                 </div>
 
+                {/* Mode Breakdown — under all-time stats */}
+                {(stats.avgWpmWords !== null ||
+                  stats.avgWpmSentences !== null) && (
+                  <div className="profile-section">
+                    <h3 className="profile-section-title">average by mode</h3>
+                    <div className="profile-modes">
+                      {stats.avgWpmWords !== null && (
+                        <div className="profile-mode-stat">
+                          <span className="profile-mode-value">
+                            {stats.avgWpmWords}
+                          </span>
+                          <span className="profile-mode-label">
+                            words
+                          </span>
+                        </div>
+                      )}
+                      {stats.avgWpmSentences !== null && (
+                        <div className="profile-mode-stat">
+                          <span className="profile-mode-value">
+                            {stats.avgWpmSentences}
+                          </span>
+                          <span className="profile-mode-label">
+                            sentences
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* Trend */}
                 {stats.trend !== 0 && (
                   <div
@@ -613,33 +643,6 @@ export default function Profile({ visible, user, onClose, onSignOut, onOpenSocia
                         </div>
                       )}
                     </div>
-                  </div>
-                )}
-
-                {/* Mode Breakdown */}
-                {(stats.avgWpmWords !== null ||
-                  stats.avgWpmSentences !== null) && (
-                  <div className="profile-modes">
-                    {stats.avgWpmWords !== null && (
-                      <div className="profile-mode-stat">
-                        <span className="profile-mode-value">
-                          {stats.avgWpmWords}
-                        </span>
-                        <span className="profile-mode-label">
-                          avg wpm (words)
-                        </span>
-                      </div>
-                    )}
-                    {stats.avgWpmSentences !== null && (
-                      <div className="profile-mode-stat">
-                        <span className="profile-mode-value">
-                          {stats.avgWpmSentences}
-                        </span>
-                        <span className="profile-mode-label">
-                          avg wpm (sentences)
-                        </span>
-                      </div>
-                    )}
                   </div>
                 )}
 

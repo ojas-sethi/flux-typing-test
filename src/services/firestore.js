@@ -313,9 +313,11 @@ export async function saveTestResult(uid, result) {
   });
 }
 
-export async function getTestHistory(uid, count = 50) {
+export async function getTestHistory(uid, count) {
   const ref = collection(db, "users", uid, "tests");
-  const q = query(ref, orderBy("completedAt", "desc"), limit(count));
+  const q = count
+    ? query(ref, orderBy("completedAt", "desc"), limit(count))
+    : query(ref, orderBy("completedAt", "desc"));
   const snap = await getDocs(q);
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
@@ -330,9 +332,11 @@ export async function saveRaceResult(uid, result) {
   });
 }
 
-export async function getRaceHistory(uid, count = 50) {
+export async function getRaceHistory(uid, count) {
   const ref = collection(db, "users", uid, "races");
-  const q = query(ref, orderBy("completedAt", "desc"), limit(count));
+  const q = count
+    ? query(ref, orderBy("completedAt", "desc"), limit(count))
+    : query(ref, orderBy("completedAt", "desc"));
   const snap = await getDocs(q);
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }

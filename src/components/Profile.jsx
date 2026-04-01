@@ -157,8 +157,8 @@ export default function Profile({ visible, user, onClose, onSignOut, onOpenSocia
       setLoading(true);
       Promise.all([
         getUserProfile(user.uid),
-        getTestHistory(user.uid, 50).catch(() => []),
-        getRaceHistory(user.uid, 50).catch(() => []),
+        getTestHistory(user.uid).catch(() => []),
+        getRaceHistory(user.uid).catch(() => []),
       ])
         .then(([prof, hist, raceHist]) => {
           setProfile(prof);

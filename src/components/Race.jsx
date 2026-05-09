@@ -235,7 +235,7 @@ export default function Race({ visible, user, profile, onClose }) {
 
   // ── Push session history and save race result when entering results phase ──
   useEffect(() => {
-    if (phase === "results" && raceData && !didPushSessionRef.current) {
+    if (phase === "results" && raceData && raceData.status === "finished" && !didPushSessionRef.current) {
       didPushSessionRef.current = true;
 
       const participants = raceData.participants || {};

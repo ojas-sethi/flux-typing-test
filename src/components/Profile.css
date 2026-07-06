@@ -43,7 +43,7 @@
   font-weight: 500;
   padding: 0.45rem 1.1rem;
   border: 1px solid var(--border);
-  border-radius: 100px;
+  border-radius: var(--radius);
   background: var(--bg-surface);
   color: var(--text-secondary);
   cursor: pointer;
@@ -249,7 +249,7 @@
   font-size: 0.68rem;
   font-weight: 500;
   padding: 0.3rem 0.8rem;
-  border-radius: 100px;
+  border-radius: var(--radius);
   cursor: pointer;
   transition: all var(--transition);
 }
@@ -410,7 +410,7 @@
   font-weight: 500;
   text-align: center;
   padding: 0.6rem 1rem;
-  border-radius: 100px;
+  border-radius: var(--radius);
   margin-bottom: 1.5rem;
 }
 
@@ -569,7 +569,7 @@
   text-transform: uppercase;
   letter-spacing: 0.4px;
   padding: 0.1rem 0.4rem;
-  border-radius: 100px;
+  border-radius: var(--radius);
   background: var(--accent-dim);
   color: var(--accent);
   border: 1px solid var(--accent);

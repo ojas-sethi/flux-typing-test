@@ -276,7 +276,7 @@ export default function Social({ visible, user, onClose }) {
       ctx.lineTo(w - pad.right, y);
       ctx.stroke();
       ctx.fillStyle = textColor;
-      ctx.font = "10px Outfit, sans-serif";
+      ctx.font = "9px 'IBM Plex Mono', monospace";
       ctx.textAlign = "right";
       ctx.fillText(Math.round(maxWpm * 1.15 * (1 - i / 3)), pad.left - 8, y + 3);
     }

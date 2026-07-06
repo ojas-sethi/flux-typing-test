@@ -227,7 +227,7 @@ export default function Profile({ visible, user, onClose, onSignOut, onOpenSocia
 
       const val = Math.round(maxWpm * 1.15 * (1 - i / 3));
       ctx.fillStyle = textColor;
-      ctx.font = "10px Outfit, sans-serif";
+      ctx.font = "9px 'IBM Plex Mono', monospace";
       ctx.textAlign = "right";
       ctx.fillText(val, pad.left - 8, y + 3);
     }

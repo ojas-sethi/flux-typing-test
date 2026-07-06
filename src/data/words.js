@@ -53,7 +53,61 @@ export const SENTENCES = [
   "Write it on your heart that every day is the best day of the year and live accordingly.",
 ];
 
-export function generateWordList(mode, count = 200) {
+function randomNumberWord() {
+  const digits = Math.floor(Math.random() * 4) + 1;
+  let num = "";
+  for (let i = 0; i < digits; i++) {
+    num += Math.floor(Math.random() * 10);
+  }
+  return num;
+}
+
+function applyPunctuationAndNumbers(words, { punctuation, numbers }) {
+  const result = [];
+  let capitalizeNext = punctuation;
+
+  for (let word of words) {
+    if (numbers && Math.random() < 0.08) {
+      result.push(randomNumberWord());
+      continue;
+    }
+
+    if (punctuation) {
+      if (capitalizeNext) {
+        word = word[0].toUpperCase() + word.slice(1);
+        capitalizeNext = false;
+      }
+      const r = Math.random();
+      if (r < 0.1) {
+        word += ".";
+        capitalizeNext = true;
+      } else if (r < 0.17) {
+        word += ",";
+      } else if (r < 0.2) {
+        word += "?";
+        capitalizeNext = true;
+      } else if (r < 0.22) {
+        word += "!";
+        capitalizeNext = true;
+      } else if (r < 0.24) {
+        word = `"${word}"`;
+      } else if (r < 0.26) {
+        word += ";";
+      } else if (r < 0.28) {
+        word = `(${word})`;
+      } else if (r < 0.3) {
+        word += ":";
+      }
+    }
+
+    result.push(word);
+  }
+  return result;
+}
+
+export function generateWordList(mode, count = 200, options = {}) {
+  const { punctuation = false, numbers = false } = options;
+
   if (mode === "words") {
     const result = [];
     let lastWord = "";
@@ -64,6 +118,9 @@ export function generateWordList(mode, count = 200) {
       } while (word === lastWord);
       lastWord = word;
       result.push(word);
+    }
+    if (punctuation || numbers) {
+      return applyPunctuationAndNumbers(result, { punctuation, numbers });
     }
     return result;
   }

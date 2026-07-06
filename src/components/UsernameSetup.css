@@ -121,7 +121,7 @@
   font-weight: 600;
   padding: 0.75rem 2.5rem;
   border: none;
-  border-radius: 100px;
+  border-radius: var(--radius);
   background: var(--accent);
   color: #fff;
   cursor: pointer;
@@ -130,7 +130,7 @@
 
 .username-submit:hover:not(:disabled) {
   opacity: 0.9;
-  box-shadow: 0 0 20px var(--accent-glow);
+  box-shadow: none;
 }
 
 .username-submit:disabled {

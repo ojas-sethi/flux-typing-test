@@ -8,61 +8,66 @@
 }
 
 :root {
-  --font-mono: "IBM Plex Mono", monospace;
-  --font-sans: "Outfit", -apple-system, BlinkMacSystemFont, sans-serif;
-  --radius: 12px;
-  --radius-lg: 20px;
+  --font-mono: "IBM Plex Mono", "SFMono-Regular", Menlo, monospace;
+  --font-sans: "IBM Plex Mono", "SFMono-Regular", Menlo, monospace;
+  --font-serif: "Instrument Serif", Georgia, serif;
+  --radius: 2px;
+  --radius-lg: 4px;
   --transition: 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* Ink on paper — warm near-black, cream ink, klein blue accent */
 [data-theme="dark"] {
-  --bg: #09090b;
-  --bg-surface: #111113;
-  --bg-elevated: #1a1a1e;
-  --bg-card: #111113;
-  --bg-glass: rgba(17, 17, 19, 0.75);
-  --text-primary: #e4e4e7;
-  --text-secondary: #71717a;
-  --text-muted: #52525b;
-  --accent: #06b6d4;
-  --accent-dim: rgba(6, 182, 212, 0.08);
-  --accent-glow: rgba(6, 182, 212, 0.35);
-  --correct: #f4f4f5;
-  --incorrect: #f43f5e;
-  --incorrect-bg: rgba(244, 63, 94, 0.1);
-  --extra: #e11d48;
-  --caret: #22d3ee;
-  --border: rgba(255, 255, 255, 0.07);
-  --border-accent: rgba(6, 182, 212, 0.15);
-  --chart-line: #06b6d4;
-  --chart-grid: rgba(255, 255, 255, 0.06);
-  --shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-  --glow: 0 0 24px rgba(6, 182, 212, 0.08);
+  --bg: #121110;
+  --bg-surface: #171614;
+  --bg-elevated: #211f1c;
+  --bg-card: #121110;
+  --bg-glass: rgba(18, 17, 16, 0.92);
+  --text-primary: #eae7df;
+  --text-secondary: #918c80;
+  --text-muted: #57534a;
+  --accent: #6373ff;
+  --accent-dim: rgba(99, 115, 255, 0.09);
+  --accent-glow: rgba(99, 115, 255, 0.18);
+  --correct: #eae7df;
+  --incorrect: #ff5c33;
+  --incorrect-bg: rgba(255, 92, 51, 0.07);
+  --extra: #c74b2c;
+  --caret: #6373ff;
+  --border: rgba(234, 231, 223, 0.12);
+  --border-accent: rgba(99, 115, 255, 0.35);
+  --chart-line: #6373ff;
+  --chart-grid: rgba(234, 231, 223, 0.07);
+  --shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  --glow: none;
+  --grain-opacity: 0.05;
 }
 
+/* Paper — warm off-white, near-black ink */
 [data-theme="light"] {
-  --bg: #f4f4f5;
-  --bg-surface: #ffffff;
-  --bg-elevated: #e9e9ec;
-  --bg-card: #ffffff;
-  --bg-glass: rgba(255, 255, 255, 0.75);
-  --text-primary: #18181b;
-  --text-secondary: #71717a;
-  --text-muted: #a1a1aa;
-  --accent: #0891b2;
-  --accent-dim: rgba(8, 145, 178, 0.07);
-  --accent-glow: rgba(8, 145, 178, 0.2);
-  --correct: #18181b;
-  --incorrect: #e11d48;
-  --incorrect-bg: rgba(225, 29, 72, 0.06);
-  --extra: #be123c;
-  --caret: #06b6d4;
-  --border: rgba(0, 0, 0, 0.07);
-  --border-accent: rgba(8, 145, 178, 0.15);
-  --chart-line: #0891b2;
-  --chart-grid: rgba(0, 0, 0, 0.06);
-  --shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
-  --glow: 0 0 24px rgba(8, 145, 178, 0.06);
+  --bg: #f4f2ec;
+  --bg-surface: #faf8f3;
+  --bg-elevated: #e9e6dd;
+  --bg-card: #f4f2ec;
+  --bg-glass: rgba(244, 242, 236, 0.92);
+  --text-primary: #191712;
+  --text-secondary: #7b766b;
+  --text-muted: #aaa496;
+  --accent: #1d3ddb;
+  --accent-dim: rgba(29, 61, 219, 0.07);
+  --accent-glow: rgba(29, 61, 219, 0.14);
+  --correct: #191712;
+  --incorrect: #d63c00;
+  --incorrect-bg: rgba(214, 60, 0, 0.06);
+  --extra: #a53410;
+  --caret: #1d3ddb;
+  --border: rgba(25, 23, 18, 0.14);
+  --border-accent: rgba(29, 61, 219, 0.4);
+  --chart-line: #1d3ddb;
+  --chart-grid: rgba(25, 23, 18, 0.07);
+  --shadow: 0 12px 40px rgba(25, 23, 18, 0.1);
+  --glow: none;
+  --grain-opacity: 0.04;
 }
 
 /* ── Base ──────────────────────────────────────────────────── */
@@ -71,7 +76,7 @@ html {
 }
 
 body {
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   background: var(--bg);
   color: var(--text-primary);
   min-height: 100vh;
@@ -81,6 +86,23 @@ body {
   overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Paper grain */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: var(--grain-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--bg);
 }
 
 #root {

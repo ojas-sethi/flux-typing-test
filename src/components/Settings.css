@@ -1,82 +1,85 @@
-/* ── Floating Dock ─────────────────────────────────────────── */
+/* ── Caption Line ──────────────────────────────────────────── */
 .settings {
-  position: fixed;
-  bottom: 2rem;
-  left: 50%;
-  transform: translateX(-50%);
   display: flex;
-  align-items: center;
-  gap: 0;
-  background: var(--bg-glass);
-  border: 1px solid var(--border);
-  border-radius: 100px;
-  padding: 0.4rem 0.5rem;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  box-shadow: var(--shadow);
-  z-index: 50;
+  align-items: baseline;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  margin-top: 3rem;
   transition: opacity var(--transition), transform var(--transition);
 }
 
 .settings.faded {
   opacity: 0;
-  transform: translateX(-50%) translateY(20px);
+  transform: translateY(8px);
   pointer-events: none;
 }
 
-.settings .divider {
-  width: 1px;
-  height: 1rem;
-  background: var(--border);
-  margin: 0 0.25rem;
-  flex-shrink: 0;
+.settings-group {
+  display: flex;
+  align-items: baseline;
+  gap: 0.95rem;
+}
+
+.settings .sep {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  user-select: none;
 }
 
 .settings-group-label {
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-size: 0.6rem;
-  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.14em;
   color: var(--text-muted);
-  padding: 0 0.2rem;
   user-select: none;
-  flex-shrink: 0;
 }
 
 .settings button {
-  font-family: var(--font-sans);
-  font-size: 0.75rem;
-  font-weight: 500;
-  padding: 0.45rem 0.9rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  padding: 0;
   border: none;
-  border-radius: 100px;
-  background: transparent;
+  background: none;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: all var(--transition);
+  transition: color var(--transition);
   white-space: nowrap;
+  text-underline-offset: 5px;
+  font-variant-numeric: tabular-nums;
 }
 
 .settings button:hover {
   color: var(--text-primary);
-  background: var(--bg-elevated);
+  text-decoration: underline;
 }
 
 .settings button.active {
   color: var(--accent);
-  background: var(--accent-dim);
-  font-weight: 600;
+  font-weight: 500;
+  text-decoration: underline;
+}
+
+.settings button.dimmed {
+  opacity: 0.35;
 }
 
 /* ── Responsive ───────────────────────────────────────────── */
 @media (max-width: 700px) {
   .settings {
-    bottom: 1.25rem;
-    padding: 0.35rem 0.4rem;
+    margin-top: 2.25rem;
+    gap: 0.55rem 0.8rem;
   }
-  .settings button {
-    padding: 0.4rem 0.65rem;
-    font-size: 0.7rem;
+  .settings-group {
+    gap: 0.7rem;
+  }
+  .settings .sep {
+    display: none;
+  }
+  .settings-group {
+    padding: 0 0.35rem;
   }
 }

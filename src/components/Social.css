@@ -36,7 +36,7 @@
   font-weight: 500;
   padding: 0.45rem 1.1rem;
   border: 1px solid var(--border);
-  border-radius: 100px;
+  border-radius: var(--radius);
   background: var(--bg-surface);
   color: var(--text-secondary);
   cursor: pointer;
@@ -54,7 +54,7 @@
   font-weight: 500;
   padding: 0.45rem 1.1rem;
   border: 1px solid var(--accent);
-  border-radius: 100px;
+  border-radius: var(--radius);
   background: var(--accent-dim);
   color: var(--accent);
   cursor: pointer;
@@ -259,7 +259,7 @@
   font-weight: 500;
   padding: 0.35rem 0.85rem;
   border: 1px solid var(--accent);
-  border-radius: 100px;
+  border-radius: var(--radius);
   background: var(--accent-dim);
   color: var(--accent);
   cursor: pointer;

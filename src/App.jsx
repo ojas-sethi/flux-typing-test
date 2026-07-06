@@ -20,6 +20,11 @@ export default function App() {
     testType,
     duration,
     wordCountTarget,
+    punctuation,
+    numbers,
+    liveWpm,
+    togglePunctuation,
+    toggleNumbers,
     words,
     typedWords,
     currentInput,
@@ -43,6 +48,17 @@ export default function App() {
   const [socialVisible, setSocialVisible] = useState(false);
   const [raceVisible, setRaceVisible] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null); // null | 'saving' | 'saved' | 'error'
+  const [personalBest, setPersonalBest] = useState(null); // { prev, isNew }
+  const [soundEnabled, setSoundEnabled] = useState(
+    () => localStorage.getItem("klacks-sound") === "on"
+  );
+
+  const toggleSound = useCallback(() => {
+    setSoundEnabled((prev) => {
+      localStorage.setItem("klacks-sound", prev ? "off" : "on");
+      return !prev;
+    });
+  }, []);
 
   // When test finishes, compute results once and save if logged in
   const didComputeResults = useRef(false);
@@ -51,6 +67,15 @@ export default function App() {
       didComputeResults.current = true;
       const r = getResults();
       setResults(r);
+
+      // Personal best tracking (per test configuration, stored locally)
+      const pbKey = `klacks-pb-${mode}-${testType}-${testType === "time" ? duration : wordCountTarget}`;
+      const prevBest = parseInt(localStorage.getItem(pbKey), 10) || 0;
+      const isNew = prevBest > 0 && r.wpm > prevBest;
+      if (r.wpm > prevBest) {
+        localStorage.setItem(pbKey, String(r.wpm));
+      }
+      setPersonalBest({ prev: prevBest, isNew });
 
       // Auto-save if logged in
       if (user) {
@@ -81,6 +106,7 @@ export default function App() {
     if (!isFinished) {
       didComputeResults.current = false;
       setSaveStatus(null);
+      setPersonalBest(null);
     }
   }, [isFinished, getResults, user, mode, testType, duration, wordCountTarget]);
 
@@ -88,6 +114,7 @@ export default function App() {
   const handleRestart = useCallback(() => {
     setResults(null);
     setSaveStatus(null);
+    setPersonalBest(null);
     reset();
   }, [reset]);
 
@@ -152,29 +179,22 @@ export default function App() {
 
       <div className="app">
         <header className={isRunning ? "faded" : ""}>
-          <div className="logo">klacks</div>
-          <div className="header-actions">
-            <button
-              className="theme-toggle"
-              onClick={toggleTheme}
-              tabIndex={-1}
-              aria-label="Toggle theme"
-            >
-              {theme === "dark" ? "light" : "dark"}
-            </button>
-
+          <div className="logo">
+            klacks<span className="logo-mark">*</span>
+          </div>
+          <nav className="header-actions">
             {!authLoading &&
               (user ? (
                 <>
                   <button
-                    className="social-nav-btn"
+                    className="nav-link"
                     onClick={() => setRaceVisible(true)}
                     tabIndex={-1}
                   >
                     race
                   </button>
                   <button
-                    className="social-nav-btn"
+                    className="nav-link"
                     onClick={() => setSocialVisible(true)}
                     tabIndex={-1}
                   >
@@ -200,25 +220,37 @@ export default function App() {
                   </button>
                 </>
               ) : (
-                <button
-                  className="sign-in-btn"
-                  onClick={signIn}
-                  tabIndex={-1}
-                >
+                <button className="nav-link" onClick={signIn} tabIndex={-1}>
                   sign in
                 </button>
               ))}
-          </div>
+            <button
+              className="theme-toggle"
+              onClick={toggleTheme}
+              tabIndex={-1}
+              aria-label="Toggle theme"
+              title={theme === "dark" ? "light mode" : "dark mode"}
+            >
+              ◐
+            </button>
+          </nav>
         </header>
 
         <main className="main-content">
-          <div className={`timer-display ${isRunning ? "visible" : ""}`}>
-            {testType === "time"
-              ? timeLeft
-              : `${Math.min(currentWordIndex, wordCountTarget)}/${wordCountTarget}`}
+          <div className={`type-meta ${isRunning ? "running" : ""}`}>
+            <span className="type-meta-left">
+              {isRunning
+                ? testType === "time"
+                  ? timeLeft
+                  : `${Math.min(currentWordIndex, wordCountTarget)} / ${wordCountTarget}`
+                : `${mode} — ${testType === "time" ? `${duration}s` : `${wordCountTarget} words`}`}
+            </span>
+            <span className={`type-meta-right ${isRunning && liveWpm > 0 ? "visible" : ""}`}>
+              {liveWpm} wpm
+            </span>
           </div>
 
-          <div className="typing-card">
+          <div className="typing-stage">
             <TypingArea
               words={words}
               typedWords={typedWords}
@@ -227,29 +259,35 @@ export default function App() {
               isRunning={isRunning}
               isFinished={isFinished}
               disabled={needsUsername || profileVisible || socialVisible || raceVisible}
+              soundEnabled={soundEnabled}
               onInput={handleInput}
               onGoToPrevWord={goToPrevWord}
               onClearCurrentWord={clearCurrentWord}
             />
           </div>
 
-          <div className={`restart-hint ${isRunning ? "visible" : ""}`}>
-            <kbd>tab</kbd> + <kbd>enter</kbd> to restart
-          </div>
+          <Settings
+            mode={mode}
+            testType={testType}
+            duration={duration}
+            wordCountTarget={wordCountTarget}
+            punctuation={punctuation}
+            numbers={numbers}
+            soundEnabled={soundEnabled}
+            onModeChange={changeMode}
+            onDurationChange={changeDuration}
+            onWordCountChange={changeWordCount}
+            onTogglePunctuation={togglePunctuation}
+            onToggleNumbers={toggleNumbers}
+            onToggleSound={toggleSound}
+            faded={isRunning}
+          />
         </main>
-      </div>
 
-      {/* Floating dock settings */}
-      <Settings
-        mode={mode}
-        testType={testType}
-        duration={duration}
-        wordCountTarget={wordCountTarget}
-        onModeChange={changeMode}
-        onDurationChange={changeDuration}
-        onWordCountChange={changeWordCount}
-        faded={isRunning}
-      />
+        <footer className={`app-footer ${isRunning ? "visible" : ""}`}>
+          <kbd>tab</kbd> + <kbd>enter</kbd> to restart
+        </footer>
+      </div>
 
       <Results
         visible={isFinished}
@@ -257,6 +295,8 @@ export default function App() {
         onRestart={handleRestart}
         saveStatus={saveStatus}
         isLoggedIn={!!user}
+        personalBest={personalBest}
+        testConfig={{ mode, testType, duration, wordCountTarget, punctuation, numbers }}
       />
 
       <Profile

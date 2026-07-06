@@ -2,21 +2,60 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { generateWordList } from "../data/words";
 
 const INITIAL_WORD_COUNT = 200;
+const VALID_DURATIONS = [15, 30, 60, 120];
+const VALID_WORD_COUNTS = [10, 25, 50, 100];
+
+function loadSettings() {
+  try {
+    const raw = JSON.parse(localStorage.getItem("klacks-settings")) || {};
+    return {
+      mode: raw.mode === "sentences" ? "sentences" : "words",
+      testType: raw.testType === "wordcount" ? "wordcount" : "time",
+      duration: VALID_DURATIONS.includes(raw.duration) ? raw.duration : 15,
+      wordCountTarget: VALID_WORD_COUNTS.includes(raw.wordCountTarget)
+        ? raw.wordCountTarget
+        : 25,
+      punctuation: !!raw.punctuation,
+      numbers: !!raw.numbers,
+    };
+  } catch {
+    return {
+      mode: "words",
+      testType: "time",
+      duration: 15,
+      wordCountTarget: 25,
+      punctuation: false,
+      numbers: false,
+    };
+  }
+}
 
 export function useTypingTest() {
-  const [mode, setMode] = useState("words");
-  const [testType, setTestType] = useState("time"); // "time" | "wordcount"
-  const [duration, setDuration] = useState(15);
-  const [wordCountTarget, setWordCountTarget] = useState(25);
-  const [words, setWords] = useState(() => generateWordList("words", INITIAL_WORD_COUNT));
+  const initialRef = useRef(null);
+  if (initialRef.current === null) initialRef.current = loadSettings();
+  const init = initialRef.current;
+
+  const [mode, setMode] = useState(init.mode);
+  const [testType, setTestType] = useState(init.testType); // "time" | "wordcount"
+  const [duration, setDuration] = useState(init.duration);
+  const [wordCountTarget, setWordCountTarget] = useState(init.wordCountTarget);
+  const [punctuation, setPunctuation] = useState(init.punctuation);
+  const [numbers, setNumbers] = useState(init.numbers);
+  const [words, setWords] = useState(() =>
+    generateWordList(init.mode, INITIAL_WORD_COUNT, {
+      punctuation: init.punctuation,
+      numbers: init.numbers,
+    })
+  );
   const [typedWords, setTypedWords] = useState([]);
   const [currentInput, setCurrentInput] = useState("");
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(15);
+  const [timeLeft, setTimeLeft] = useState(init.duration);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [wpmHistory, setWpmHistory] = useState([]);
+  const [liveWpm, setLiveWpm] = useState(0);
 
   const startTimeRef = useRef(null);
   const timerRef = useRef(null);
@@ -29,6 +68,7 @@ export function useTypingTest() {
   const currentWordIndexRef = useRef(currentWordIndex);
   const testTypeRef = useRef(testType);
   const wordCountTargetRef = useRef(wordCountTarget);
+  const optionsRef = useRef({ punctuation, numbers });
 
   // Keep refs in sync
   wordsRef.current = words;
@@ -37,6 +77,15 @@ export function useTypingTest() {
   currentWordIndexRef.current = currentWordIndex;
   testTypeRef.current = testType;
   wordCountTargetRef.current = wordCountTarget;
+  optionsRef.current = { punctuation, numbers };
+
+  // Persist settings
+  useEffect(() => {
+    localStorage.setItem(
+      "klacks-settings",
+      JSON.stringify({ mode, testType, duration, wordCountTarget, punctuation, numbers })
+    );
+  }, [mode, testType, duration, wordCountTarget, punctuation, numbers]);
 
   // Count correct chars (reads from refs, no dependencies that change)
   const countCorrectChars = useCallback(() => {
@@ -64,6 +113,18 @@ export function useTypingTest() {
     return correct;
   }, []);
 
+  // Count all typed chars (for raw wpm)
+  const countTotalTypedChars = useCallback(() => {
+    const tw = typedWordsRef.current;
+    const ci = currentInputRef.current;
+    let total = 0;
+    for (let i = 0; i < tw.length; i++) {
+      if (tw[i]) total += tw[i].length + 1; // +1 for space
+    }
+    total += ci.length;
+    return total;
+  }, []);
+
   // Start timer
   const startTimer = useCallback(() => {
     setIsRunning((prev) => {
@@ -81,6 +142,12 @@ export function useTypingTest() {
     timerRef.current = setInterval(() => {
       const elapsed = (Date.now() - startTimeRef.current) / 1000;
 
+      // Live wpm (updated continuously after the first second)
+      if (elapsed >= 1) {
+        const correctChars = countCorrectChars();
+        setLiveWpm(Math.round((correctChars / 5) / (elapsed / 60)));
+      }
+
       if (testTypeRef.current === "time") {
         // Countdown mode
         const remaining = Math.max(0, duration - Math.floor(elapsed));
@@ -89,8 +156,10 @@ export function useTypingTest() {
         const currentSecond = Math.floor(elapsed);
         if (currentSecond > lastRecordedSecond.current && currentSecond <= duration) {
           const correctChars = countCorrectChars();
+          const totalChars = countTotalTypedChars();
           const wpm = elapsed > 0 ? Math.round((correctChars / 5) / (elapsed / 60)) : 0;
-          setWpmHistory((prev) => [...prev, { second: currentSecond, wpm }]);
+          const raw = elapsed > 0 ? Math.round((totalChars / 5) / (elapsed / 60)) : 0;
+          setWpmHistory((prev) => [...prev, { second: currentSecond, wpm, raw }]);
           lastRecordedSecond.current = currentSecond;
         }
 
@@ -106,15 +175,17 @@ export function useTypingTest() {
         const currentSecond = Math.floor(elapsed);
         if (currentSecond > lastRecordedSecond.current) {
           const correctChars = countCorrectChars();
+          const totalChars = countTotalTypedChars();
           const wpm = elapsed > 0 ? Math.round((correctChars / 5) / (elapsed / 60)) : 0;
-          setWpmHistory((prev) => [...prev, { second: currentSecond, wpm }]);
+          const raw = elapsed > 0 ? Math.round((totalChars / 5) / (elapsed / 60)) : 0;
+          setWpmHistory((prev) => [...prev, { second: currentSecond, wpm, raw }]);
           lastRecordedSecond.current = currentSecond;
         }
       }
     }, 100);
 
     return () => clearInterval(timerRef.current);
-  }, [isRunning, duration, countCorrectChars]);
+  }, [isRunning, duration, countCorrectChars, countTotalTypedChars]);
 
   // Check word count completion
   const checkWordCountFinish = useCallback((completedIndex) => {
@@ -156,7 +227,7 @@ export function useTypingTest() {
           if (newIndex >= wordsRef.current.length - 20) {
             setWords((prev) => [
               ...prev,
-              ...generateWordList(mode, INITIAL_WORD_COUNT),
+              ...generateWordList(mode, INITIAL_WORD_COUNT, optionsRef.current),
             ]);
           }
         }
@@ -275,9 +346,10 @@ export function useTypingTest() {
   }, [duration, wpmHistory]);
 
   // Full reset helper
-  const fullReset = useCallback((newMode, newTestType, newDuration, newWordCountTarget) => {
+  const fullReset = useCallback((newMode, newTestType, newDuration, newWordCountTarget, opts) => {
     clearInterval(timerRef.current);
-    const newWords = generateWordList(newMode, INITIAL_WORD_COUNT);
+    const options = opts || optionsRef.current;
+    const newWords = generateWordList(newMode, INITIAL_WORD_COUNT, options);
     setWords(newWords);
     setTypedWords([]);
     setCurrentInput("");
@@ -287,6 +359,7 @@ export function useTypingTest() {
     setTimeLeft(newTestType === "time" ? newDuration : 0);
     setElapsedTime(0);
     setWpmHistory([]);
+    setLiveWpm(0);
     startTimeRef.current = null;
     lastRecordedSecond.current = 0;
   }, []);
@@ -325,11 +398,30 @@ export function useTypingTest() {
     [mode, duration, fullReset]
   );
 
+  // Toggle punctuation (words mode)
+  const togglePunctuation = useCallback(() => {
+    const next = !punctuation;
+    setPunctuation(next);
+    fullReset(mode, testType, duration, wordCountTarget, { punctuation: next, numbers });
+  }, [punctuation, numbers, mode, testType, duration, wordCountTarget, fullReset]);
+
+  // Toggle numbers (words mode)
+  const toggleNumbers = useCallback(() => {
+    const next = !numbers;
+    setNumbers(next);
+    fullReset(mode, testType, duration, wordCountTarget, { punctuation, numbers: next });
+  }, [punctuation, numbers, mode, testType, duration, wordCountTarget, fullReset]);
+
   return {
     mode,
     testType,
     duration,
     wordCountTarget,
+    punctuation,
+    numbers,
+    liveWpm,
+    togglePunctuation,
+    toggleNumbers,
     words,
     typedWords,
     currentInput,

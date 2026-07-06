@@ -1,7 +1,15 @@
 import { useEffect, useRef, useCallback } from "react";
 import "./Results.css";
 
-export default function Results({ visible, results, onRestart, saveStatus, isLoggedIn }) {
+export default function Results({
+  visible,
+  results,
+  onRestart,
+  saveStatus,
+  isLoggedIn,
+  personalBest,
+  testConfig,
+}) {
   const canvasRef = useRef(null);
 
   const drawChart = useCallback(() => {
@@ -23,7 +31,12 @@ export default function Results({ visible, results, onRestart, saveStatus, isLog
     const data = results.wpmHistory;
     if (!data || data.length < 2) return;
 
-    const maxWpm = Math.max(...data.map((d) => d.wpm), 10);
+    const hasRaw = data.some((d) => typeof d.raw === "number");
+    const maxWpm = Math.max(
+      ...data.map((d) => d.wpm),
+      ...(hasRaw ? data.map((d) => d.raw || 0) : []),
+      10
+    );
     const maxTime = data[data.length - 1].second;
     const chartW = w - pad.left - pad.right;
     const chartH = h - pad.top - pad.bottom;
@@ -35,6 +48,7 @@ export default function Results({ visible, results, onRestart, saveStatus, isLog
     const lineColor = style.getPropertyValue("--chart-line").trim();
     const gridColor = style.getPropertyValue("--chart-grid").trim();
     const textColor = style.getPropertyValue("--text-secondary").trim();
+    const mutedColor = style.getPropertyValue("--text-muted").trim();
 
     // Grid lines
     ctx.strokeStyle = gridColor;
@@ -48,7 +62,7 @@ export default function Results({ visible, results, onRestart, saveStatus, isLog
 
       const val = Math.round(maxWpm * 1.15 * (1 - i / 3));
       ctx.fillStyle = textColor;
-      ctx.font = "10px Outfit, sans-serif";
+      ctx.font = "9px 'IBM Plex Mono', monospace";
       ctx.textAlign = "right";
       ctx.fillText(val, pad.left - 8, y + 3);
     }
@@ -60,6 +74,24 @@ export default function Results({ visible, results, onRestart, saveStatus, isLog
     for (let i = 0; i < data.length; i += xInterval) {
       ctx.fillStyle = textColor;
       ctx.fillText(data[i].second + "s", xScale(data[i].second), h - 4);
+    }
+
+    // Raw wpm line (muted, behind the main line)
+    if (hasRaw) {
+      ctx.beginPath();
+      ctx.strokeStyle = mutedColor;
+      ctx.lineWidth = 1.25;
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      ctx.globalAlpha = 0.55;
+      data.forEach((d, i) => {
+        const x = xScale(d.second);
+        const y = yScale(d.raw || 0);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+      ctx.globalAlpha = 1;
     }
 
     // Line
@@ -106,34 +138,73 @@ export default function Results({ visible, results, onRestart, saveStatus, isLog
 
   if (!results) return null;
 
+  // Build meta description line: "words · 15s · punctuation"
+  const metaParts = [];
+  if (testConfig) {
+    metaParts.push(testConfig.mode);
+    if (testConfig.testType === "time") {
+      metaParts.push(`${testConfig.duration}s`);
+    } else {
+      metaParts.push(`${testConfig.wordCountTarget} words`);
+      if (results.timeTaken) metaParts.push(`${results.timeTaken}s`);
+    }
+    if (testConfig.mode === "words" && testConfig.punctuation) metaParts.push("punctuation");
+    if (testConfig.mode === "words" && testConfig.numbers) metaParts.push("numbers");
+  }
+
   return (
     <div className={`results-container ${visible ? "visible" : ""}`}>
       <div className="results">
-        <div className="results-hero">
-          <span className="results-hero-value">{results.wpm}</span>
-          <span className="results-hero-label">wpm</span>
-        </div>
+        <div className="results-spread">
+          <div className="results-left">
+            <div className="results-eyebrow">— result</div>
+            <div className="results-hero">
+              <span className="results-hero-value">{results.wpm}</span>
+              <span className="results-hero-label">wpm</span>
+            </div>
+            {metaParts.length > 0 && (
+              <div className="results-meta">{metaParts.join(" · ")}</div>
+            )}
+            {personalBest?.isNew ? (
+              <div className="pb-badge">
+                <span className="pb-star">*</span> new personal best
+                {personalBest.prev > 0 && (
+                  <span className="pb-prev"> — was {personalBest.prev}</span>
+                )}
+              </div>
+            ) : (
+              personalBest?.prev > 0 && (
+                <div className="pb-note">personal best {personalBest.prev} wpm</div>
+              )
+            )}
+          </div>
 
-        <div className="results-grid">
-          <div className="stat-card">
-            <span className="stat-value">
-              {results.accuracy}<small>%</small>
-            </span>
-            <span className="stat-label">accuracy</span>
-          </div>
-          <div className="stat-card">
-            <span className="stat-value">{results.rawWpm}</span>
-            <span className="stat-label">raw wpm</span>
-          </div>
-          <div className="stat-card">
-            <span className="stat-value">{results.totalChars}</span>
-            <span className="stat-label">characters</span>
-          </div>
-          <div className="stat-card">
-            <span className="stat-value">
-              {results.consistency}<small>%</small>
-            </span>
-            <span className="stat-label">consistency</span>
+          <div className="results-right">
+            <div className="stat-row">
+              <span className="stat-label">accuracy</span>
+              <span className="stat-value">{results.accuracy}%</span>
+            </div>
+            <div className="stat-row">
+              <span className="stat-label">raw</span>
+              <span className="stat-value">{results.rawWpm}</span>
+            </div>
+            <div className="stat-row">
+              <span className="stat-label">consistency</span>
+              <span className="stat-value">{results.consistency}%</span>
+            </div>
+            <div className="stat-row">
+              <span className="stat-label">characters</span>
+              <span className="stat-value">{results.totalChars}</span>
+            </div>
+            <div className="stat-row chars">
+              <span className="stat-label">errors</span>
+              <span className="stat-value">
+                <em className={results.incorrectChars > 0 ? "bad" : ""}>
+                  {results.incorrectChars} wrong
+                </em>
+                {" / "}{results.extraChars} extra{" / "}{results.missedChars} missed
+              </span>
+            </div>
           </div>
         </div>
 
@@ -142,36 +213,24 @@ export default function Results({ visible, results, onRestart, saveStatus, isLog
         </div>
 
         <div className="results-footer">
-          <div className="char-breakdown">
-            <span className="char-stat">
-              <span className="dot correct" />
-              {results.correctChars} correct
-            </span>
-            <span className="char-stat">
-              <span className="dot incorrect" />
-              {results.incorrectChars} incorrect
-            </span>
-            <span className="char-stat">
-              <span className="dot extra" />
-              {results.extraChars} extra
-            </span>
-            <span className="char-stat">
-              <span className="dot missed" />
-              {results.missedChars} missed
-            </span>
-          </div>
-
-          {isLoggedIn && saveStatus && (
+          {isLoggedIn && saveStatus ? (
             <span className={`save-status ${saveStatus}`}>
               {saveStatus === "saving" && "saving..."}
               {saveStatus === "saved" && "result saved"}
               {saveStatus === "error" && "save failed"}
             </span>
+          ) : (
+            <span className="save-status" />
           )}
 
-          <button className="restart-btn" onClick={onRestart} tabIndex={-1}>
-            try again
-          </button>
+          <div className="results-actions">
+            <button className="restart-btn" onClick={onRestart} tabIndex={-1}>
+              try again <span className="restart-arrow">↳</span>
+            </button>
+            <span className="results-kbd-hint">
+              <kbd>tab</kbd>+<kbd>enter</kbd>
+            </span>
+          </div>
         </div>
       </div>
     </div>

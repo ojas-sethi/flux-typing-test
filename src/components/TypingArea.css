@@ -16,19 +16,18 @@
 /* ── Typing Area ──────────────────────────────────────────── */
 .typing-area {
   font-family: var(--font-mono);
-  font-size: 1.3rem;
+  font-size: 1.5rem;
   line-height: 2.2;
-  letter-spacing: 0.2px;
+  letter-spacing: 0;
   position: relative;
   overflow: hidden;
-  height: calc(1.3rem * 2.2 * 3);
+  height: calc(1.5rem * 2.2 * 3);
   transition: filter var(--transition), opacity var(--transition), transform var(--transition);
 }
 
 .typing-area.blurred {
-  filter: blur(6px);
-  opacity: 0.25;
-  transform: scale(0.998);
+  filter: blur(7px);
+  opacity: 0.2;
 }
 
 .typing-area::after {
@@ -37,8 +36,8 @@
   bottom: 0;
   left: 0;
   right: 0;
-  height: calc(1.3rem * 2.2 * 1.2);
-  background: linear-gradient(transparent, var(--bg-card));
+  height: calc(1.5rem * 2.2 * 1.1);
+  background: linear-gradient(transparent, var(--bg));
   pointer-events: none;
   z-index: 2;
 }
@@ -51,7 +50,7 @@
 
 .word {
   display: inline-block;
-  margin: 0 0.4em 0 0;
+  margin: 0 0.42em 0 0;
 }
 
 /* ── Letters ──────────────────────────────────────────────── */
@@ -69,37 +68,34 @@
 .letter.incorrect {
   color: var(--incorrect);
   background: var(--incorrect-bg);
-  border-radius: 2px;
+  border-radius: var(--radius);
 }
 
 .letter.missed {
-  opacity: 0.3;
+  opacity: 0.35;
   text-decoration: underline;
   text-decoration-color: var(--incorrect);
-  text-underline-offset: 3px;
-  text-decoration-thickness: 1.5px;
+  text-underline-offset: 4px;
+  text-decoration-thickness: 1px;
 }
 
 .letter.extra {
   color: var(--extra);
-  opacity: 0.45;
+  opacity: 0.5;
 }
 
-/* ── Caret (vertical line with glow) ─────────────────────── */
+/* ── Caret ────────────────────────────────────────────────── */
 .caret {
   position: absolute;
-  width: 2.5px;
-  height: 1.5rem;
+  width: 2px;
+  height: 1.7rem;
   background: var(--caret);
-  border-radius: 2px;
   top: 0;
   left: 0;
   z-index: 10;
   transition: left 0.1s cubic-bezier(0.25, 1, 0.5, 1),
               top 0.3s cubic-bezier(0.25, 1, 0.5, 1);
   will-change: left, top;
-  box-shadow: 0 0 10px var(--accent-glow),
-              0 0 3px var(--accent-glow);
 }
 
 .caret.blink {
@@ -108,7 +104,30 @@
 
 @keyframes caretFade {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.15; }
+  50% { opacity: 0.1; }
+}
+
+/* ── Caps Lock Warning ────────────────────────────────────── */
+.caps-warning {
+  position: absolute;
+  top: -2.95rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--incorrect);
+  z-index: 20;
+  pointer-events: none;
+  animation: capsPulse 1.6s ease-in-out infinite;
+  white-space: nowrap;
+}
+
+@keyframes capsPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
 }
 
 /* ── Focus Overlay ────────────────────────────────────────── */
@@ -122,28 +141,26 @@
 }
 
 .focus-overlay span {
-  font-family: var(--font-sans);
-  font-size: 0.82rem;
-  color: var(--text-secondary);
-  letter-spacing: 0.2px;
-  font-weight: 500;
-  padding: 0.5rem 1.3rem;
-  background: var(--bg-elevated);
-  border-radius: 100px;
-  border: 1px solid var(--border);
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 1.35rem;
+  color: var(--text-primary);
+  letter-spacing: 0;
 }
 
 /* ── Responsive ───────────────────────────────────────────── */
 @media (max-width: 700px) {
   .typing-area {
-    font-size: 1.05rem;
-    height: calc(1.05rem * 2.2 * 3);
+    font-size: 1.1rem;
+    height: calc(1.1rem * 2.2 * 3);
   }
   .typing-area::after {
-    height: calc(1.05rem * 2.2 * 1.2);
+    height: calc(1.1rem * 2.2 * 1.1);
   }
   .caret {
-    height: 1.2rem;
-    width: 2px;
+    height: 1.3rem;
+  }
+  .focus-overlay span {
+    font-size: 1.1rem;
   }
 }

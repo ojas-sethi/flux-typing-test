@@ -1,4 +1,5 @@
 import { useRef, useEffect, useCallback, useState, useMemo } from "react";
+import { playClick, playError } from "../utils/sound";
 import "./TypingArea.css";
 
 export default function TypingArea({
@@ -9,6 +10,7 @@ export default function TypingArea({
   isRunning,
   isFinished,
   disabled,
+  soundEnabled,
   onInput,
   onGoToPrevWord,
   onClearCurrentWord,
@@ -21,6 +23,22 @@ export default function TypingArea({
   const scrollOffsetRef = useRef(0);
   const caretBlinkTimeout = useRef(null);
   const [caretBlink, setCaretBlink] = useState(true);
+  const [capsOn, setCapsOn] = useState(false);
+
+  // Caps lock detection
+  useEffect(() => {
+    const update = (e) => {
+      if (e.getModifierState) {
+        setCapsOn(e.getModifierState("CapsLock"));
+      }
+    };
+    window.addEventListener("keydown", update);
+    window.addEventListener("keyup", update);
+    return () => {
+      window.removeEventListener("keydown", update);
+      window.removeEventListener("keyup", update);
+    };
+  }, []);
 
   // Focus input
   const focusInput = useCallback(() => {
@@ -81,9 +99,30 @@ export default function TypingArea({
         if (inputRef.current) inputRef.current.value = "";
         return;
       }
-      onInput(e.target.value);
+      const value = e.target.value;
+
+      // Typing sounds
+      if (soundEnabled) {
+        if (value.length > currentInput.length) {
+          const ch = value[value.length - 1];
+          if (ch === " ") {
+            playClick();
+          } else {
+            const expected = words[currentWordIndex]?.[value.length - 1];
+            if (expected === undefined || ch !== expected) {
+              playError();
+            } else {
+              playClick();
+            }
+          }
+        } else if (value.length < currentInput.length) {
+          playClick();
+        }
+      }
+
+      onInput(value);
     },
-    [onInput]
+    [onInput, soundEnabled, currentInput, currentWordIndex, words]
   );
 
   // Handle keydown for backspace navigation and caret blink
@@ -188,6 +227,9 @@ export default function TypingArea({
 
   return (
     <div className="typing-wrapper" onClick={handleWrapperClick}>
+      {capsOn && !isFinished && (
+        <div className="caps-warning">caps lock</div>
+      )}
       <input
         ref={inputRef}
         type="text"
@@ -258,7 +300,7 @@ export default function TypingArea({
 
       {!isFocused && !isFinished && (
         <div className="focus-overlay visible">
-          <span>click here or press any key to focus</span>
+          <span>click, or press any key</span>
         </div>
       )}
     </div>

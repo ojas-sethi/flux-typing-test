@@ -13,47 +13,99 @@ export default function Settings({
   testType,
   duration,
   wordCountTarget,
+  punctuation,
+  numbers,
+  soundEnabled,
   onModeChange,
   onDurationChange,
   onWordCountChange,
+  onTogglePunctuation,
+  onToggleNumbers,
+  onToggleSound,
   faded,
 }) {
+  const modifiersDimmed = mode !== "words";
+
   return (
     <div className={`settings ${faded ? "faded" : ""}`}>
-      {MODES.map((m) => (
+      <div className="settings-group">
+        {MODES.map((m) => (
+          <button
+            key={m.key}
+            className={mode === m.key ? "active" : ""}
+            onClick={() => onModeChange(m.key)}
+            tabIndex={-1}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+
+      <span className="sep" aria-hidden="true">·</span>
+
+      <div className="settings-group">
         <button
-          key={m.key}
-          className={mode === m.key ? "active" : ""}
-          onClick={() => onModeChange(m.key)}
+          className={`${punctuation ? "active" : ""} ${modifiersDimmed ? "dimmed" : ""}`}
+          onClick={onTogglePunctuation}
           tabIndex={-1}
+          title="add punctuation (words mode)"
         >
-          {m.label}
+          !?
         </button>
-      ))}
-      <span className="divider" />
-      <span className="settings-group-label">time</span>
-      {DURATIONS.map((d) => (
         <button
-          key={`t${d}`}
-          className={testType === "time" && duration === d ? "active" : ""}
-          onClick={() => onDurationChange(d)}
+          className={`${numbers ? "active" : ""} ${modifiersDimmed ? "dimmed" : ""}`}
+          onClick={onToggleNumbers}
           tabIndex={-1}
+          title="add numbers (words mode)"
         >
-          {d}s
+          123
         </button>
-      ))}
-      <span className="divider" />
-      <span className="settings-group-label">words</span>
-      {WORD_COUNTS.map((c) => (
+      </div>
+
+      <span className="sep" aria-hidden="true">·</span>
+
+      <div className="settings-group">
+        <span className="settings-group-label">time</span>
+        {DURATIONS.map((d) => (
+          <button
+            key={`t${d}`}
+            className={testType === "time" && duration === d ? "active" : ""}
+            onClick={() => onDurationChange(d)}
+            tabIndex={-1}
+          >
+            {d}
+          </button>
+        ))}
+      </div>
+
+      <span className="sep" aria-hidden="true">·</span>
+
+      <div className="settings-group">
+        <span className="settings-group-label">words</span>
+        {WORD_COUNTS.map((c) => (
+          <button
+            key={`w${c}`}
+            className={testType === "wordcount" && wordCountTarget === c ? "active" : ""}
+            onClick={() => onWordCountChange(c)}
+            tabIndex={-1}
+          >
+            {c}
+          </button>
+        ))}
+      </div>
+
+      <span className="sep" aria-hidden="true">·</span>
+
+      <div className="settings-group">
         <button
-          key={`w${c}`}
-          className={testType === "wordcount" && wordCountTarget === c ? "active" : ""}
-          onClick={() => onWordCountChange(c)}
+          className={soundEnabled ? "active" : ""}
+          onClick={onToggleSound}
           tabIndex={-1}
+          title="typing sounds"
         >
-          {c}
+          sound
         </button>
-      ))}
+      </div>
     </div>
   );
 }

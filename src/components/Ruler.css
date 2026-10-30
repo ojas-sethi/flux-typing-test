@@ -1,0 +1,30 @@
+.ruler {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  height: 26px;
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.ruler .tick {
+  width: 1px;
+  flex-shrink: 0;
+  background: var(--tick);
+  transition: height 0.35s var(--ease), background 0.2s ease;
+}
+
+.ruler .tick.on {
+  background: var(--text-secondary);
+}
+
+.ruler .tick.speed {
+  width: 2px;
+  background: var(--accent);
+}
+
+.ruler .tick.head {
+  height: 26px !important;
+  width: 2px;
+  background: var(--text-primary);
+}

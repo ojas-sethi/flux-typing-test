@@ -1,12 +1,36 @@
-# React + Vite
+# klacks
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A minimalist typing test that gets out of your way. Built with React + Vite, backed by Firebase.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Test modes** — random common words or full sentences, timed (15/30/60/120s) or word-count (10/25/50/100) tests, picked from a one-line spec ("words / 30 seconds")
+- **Punctuation & numbers** — optional toggles to mix capitalization, punctuation, and digits into words mode
+- **Live ruler** — a tick ruler tracks progress; each finished second (or word) grows into a bar showing how fast you typed it
+- **Live feedback** — smooth caret, per-letter coloring, live WPM, caps lock warning
+- **Typing sounds** — subtle synthesized mechanical "klack" on each keystroke with an error thud (toggleable, no audio assets)
+- **Results** — WPM, accuracy, raw, consistency, character breakdown, a per-second rhythm chart with error marks and hover details, copy-to-clipboard
+- **Personal bests** — tracked per test configuration, with a callout when you beat one
+- **Profile** — one filter (all / words / sentences / races) drives headline stats, a full history chart, a personal-best matrix and a test log
+- **Social** — add friends, view their stats, and race head-to-head in real time with shareable room codes
+- **Dark & light themes**, settings persisted across sessions
 
-## Expanding the ESLint configuration
+## Keyboard shortcuts
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+| Keys | Action |
+| --- | --- |
+| `tab` + `enter` | restart test |
+| `esc` | restart test |
+| `ctrl/cmd` + `backspace` | clear current word |
+| `backspace` (at word start) | go back to previous word |
+
+## Development
+
+```bash
+npm install
+npm run dev     # start dev server
+npm run build   # production build
+npm run lint    # eslint
+```
+
+Firebase config lives in `.env` (see `.env.example`).

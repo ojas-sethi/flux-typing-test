@@ -1,177 +1,298 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
+import { setupCanvas, cssVar, niceMax, drawGrid, AXIS_FONT } from "../utils/chart";
 import "./Results.css";
 
-export default function Results({ visible, results, onRestart, saveStatus, isLoggedIn }) {
+const PAD = { top: 10, right: 6, bottom: 34, left: 40 };
+
+export default function Results({
+  visible,
+  results,
+  onRestart,
+  saveStatus,
+  isLoggedIn,
+  personalBest,
+  testConfig,
+}) {
   const canvasRef = useRef(null);
+  const [hover, setHover] = useState(null); // { i, x }
+  const [copied, setCopied] = useState(false);
 
-  const drawChart = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !results) return;
+  const data = results?.wpmHistory || [];
 
-    const ctx = canvas.getContext("2d");
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
+  const drawChart = useCallback(
+    (hoverIndex = null) => {
+      const canvas = canvasRef.current;
+      if (!canvas || data.length < 1) return;
+      const { ctx, w, h } = setupCanvas(canvas);
 
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    ctx.scale(dpr, dpr);
+      const accent = cssVar("--accent");
+      const ink = cssVar("--text-primary");
+      const grid = cssVar("--chart-grid");
+      const text = cssVar("--text-secondary");
+      const muted = cssVar("--text-muted");
+      const error = cssVar("--incorrect");
 
-    const w = rect.width;
-    const h = rect.height;
-    const pad = { top: 12, right: 12, bottom: 24, left: 36 };
+      const speeds = data.map((d) => d.burst ?? d.wpm);
+      const max = niceMax(Math.max(...speeds, ...data.map((d) => d.wpm)));
+      const left = PAD.left;
+      const right = w - PAD.right;
+      const top = PAD.top;
+      const bottom = h - PAD.bottom;
+      const slot = (right - left) / data.length;
+      const barW = Math.max(2, Math.min(slot * 0.42, 9));
+      const x = (i) => left + slot * i + slot / 2;
+      const y = (v) => bottom - (v / max) * (bottom - top);
 
-    const data = results.wpmHistory;
-    if (!data || data.length < 2) return;
+      drawGrid(ctx, { left, right, top, bottom, max, gridColor: grid, textColor: text });
 
-    const maxWpm = Math.max(...data.map((d) => d.wpm), 10);
-    const maxTime = data[data.length - 1].second;
-    const chartW = w - pad.left - pad.right;
-    const chartH = h - pad.top - pad.bottom;
+      // Speed per second — bars
+      speeds.forEach((s, i) => {
+        const bx = Math.round(x(i) - barW / 2);
+        const by = Math.round(y(s));
+        ctx.fillStyle = hoverIndex === null || hoverIndex === i ? accent : muted;
+        ctx.fillRect(bx, by, Math.round(barW), Math.max(1, Math.round(bottom) - by));
+      });
 
-    const xScale = (s) => pad.left + (s / maxTime) * chartW;
-    const yScale = (v) => pad.top + chartH - (v / (maxWpm * 1.15)) * chartH;
+      // Running average — line
+      if (data.length > 1) {
+        ctx.strokeStyle = ink;
+        ctx.lineWidth = 1.5;
+        ctx.lineJoin = "round";
+        ctx.beginPath();
+        data.forEach((d, i) => {
+          if (i === 0) ctx.moveTo(x(i), y(d.wpm));
+          else ctx.lineTo(x(i), y(d.wpm));
+        });
+        ctx.stroke();
+      }
 
-    const style = getComputedStyle(document.documentElement);
-    const lineColor = style.getPropertyValue("--chart-line").trim();
-    const gridColor = style.getPropertyValue("--chart-grid").trim();
-    const textColor = style.getPropertyValue("--text-secondary").trim();
+      // Errors — red marks under the baseline
+      data.forEach((d, i) => {
+        const n = Math.min(d.errors || 0, 3);
+        for (let k = 0; k < n; k++) {
+          ctx.fillStyle = error;
+          ctx.fillRect(Math.round(x(i) - 2), Math.round(bottom + 6 + k * 6), 4, 4);
+        }
+      });
 
-    // Grid lines
-    ctx.strokeStyle = gridColor;
-    ctx.lineWidth = 0.5;
-    for (let i = 0; i <= 3; i++) {
-      const y = pad.top + (i / 3) * chartH;
-      ctx.beginPath();
-      ctx.moveTo(pad.left, y);
-      ctx.lineTo(w - pad.right, y);
-      ctx.stroke();
-
-      const val = Math.round(maxWpm * 1.15 * (1 - i / 3));
-      ctx.fillStyle = textColor;
-      ctx.font = "10px Outfit, sans-serif";
-      ctx.textAlign = "right";
-      ctx.fillText(val, pad.left - 8, y + 3);
-    }
-
-    // X labels
-    const xSteps = Math.min(data.length, 5);
-    const xInterval = Math.max(1, Math.floor(data.length / xSteps));
-    ctx.textAlign = "center";
-    for (let i = 0; i < data.length; i += xInterval) {
-      ctx.fillStyle = textColor;
-      ctx.fillText(data[i].second + "s", xScale(data[i].second), h - 4);
-    }
-
-    // Line
-    ctx.beginPath();
-    ctx.strokeStyle = lineColor;
-    ctx.lineWidth = 2;
-    ctx.lineJoin = "round";
-    ctx.lineCap = "round";
-
-    data.forEach((d, i) => {
-      const x = xScale(d.second);
-      const y = yScale(d.wpm);
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    });
-    ctx.stroke();
-
-    // Gradient fill
-    const gradient = ctx.createLinearGradient(0, pad.top, 0, pad.top + chartH);
-    gradient.addColorStop(0, lineColor + "25");
-    gradient.addColorStop(1, lineColor + "00");
-
-    ctx.lineTo(xScale(data[data.length - 1].second), pad.top + chartH);
-    ctx.lineTo(xScale(data[0].second), pad.top + chartH);
-    ctx.closePath();
-    ctx.fillStyle = gradient;
-    ctx.fill();
-
-    // Dots
-    data.forEach((d) => {
-      ctx.beginPath();
-      ctx.arc(xScale(d.second), yScale(d.wpm), 2.5, 0, Math.PI * 2);
-      ctx.fillStyle = lineColor;
-      ctx.fill();
-    });
-  }, [results]);
+      // Seconds axis
+      ctx.font = AXIS_FONT;
+      ctx.fillStyle = text;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "alphabetic";
+      const every = Math.max(1, Math.ceil(data.length / 10));
+      data.forEach((d, i) => {
+        if ((i + 1) % every === 0) {
+          ctx.fillText(`${d.second}s`, x(i), h - 2);
+        }
+      });
+    },
+    [data]
+  );
 
   useEffect(() => {
-    if (visible && results) {
-      const t = setTimeout(drawChart, 200);
-      return () => clearTimeout(t);
-    }
+    if (!visible || !results) return;
+    const t = setTimeout(() => drawChart(), 120);
+    const onResize = () => drawChart();
+    window.addEventListener("resize", onResize);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("resize", onResize);
+    };
   }, [visible, results, drawChart]);
 
+  useEffect(() => {
+    if (!visible) {
+      setHover(null);
+      setCopied(false);
+    }
+  }, [visible]);
+
+  const handleMove = (e) => {
+    const canvas = canvasRef.current;
+    if (!canvas || !data.length) return;
+    const rect = canvas.getBoundingClientRect();
+    const px = e.clientX - rect.left;
+    const slot = (rect.width - PAD.left - PAD.right) / data.length;
+    const i = Math.floor((px - PAD.left) / slot);
+    if (i < 0 || i >= data.length) {
+      if (hover) {
+        setHover(null);
+        drawChart();
+      }
+      return;
+    }
+    if (hover?.i !== i) {
+      setHover({ i, x: PAD.left + slot * i + slot / 2 });
+      drawChart(i);
+    }
+  };
+
+  const handleLeave = () => {
+    setHover(null);
+    drawChart();
+  };
+
   if (!results) return null;
+
+  const specParts = [];
+  if (testConfig) {
+    specParts.push(testConfig.mode);
+    specParts.push(
+      testConfig.testType === "time"
+        ? `${testConfig.duration} seconds`
+        : `${testConfig.wordCountTarget} words`
+    );
+    if (testConfig.mode === "words" && testConfig.punctuation) specParts.push("punctuation");
+    if (testConfig.mode === "words" && testConfig.numbers) specParts.push("numbers");
+  }
+
+  const timeTaken =
+    testConfig?.testType === "time" ? testConfig.duration : results.timeTaken;
+
+  const handleCopy = () => {
+    const text = `klacks — ${results.wpm} wpm, ${results.accuracy}% accuracy (${specParts.join(", ")})`;
+    navigator.clipboard?.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    });
+  };
+
+  const hovered = hover ? data[hover.i] : null;
 
   return (
     <div className={`results-container ${visible ? "visible" : ""}`}>
       <div className="results">
-        <div className="results-hero">
-          <span className="results-hero-value">{results.wpm}</span>
-          <span className="results-hero-label">wpm</span>
+        <div className="results-top">
+          <span className="results-spec">{specParts.join("  /  ")}</span>
+          {personalBest?.isNew ? (
+            <span className="pb-flag">
+              <span className="led on" />
+              new personal best
+              {personalBest.prev > 0 && (
+                <span className="pb-delta">+{results.wpm - personalBest.prev}</span>
+              )}
+            </span>
+          ) : (
+            personalBest?.prev > 0 && (
+              <span className="pb-note">
+                best <strong>{personalBest.prev}</strong>
+              </span>
+            )
+          )}
         </div>
 
-        <div className="results-grid">
-          <div className="stat-card">
-            <span className="stat-value">
-              {results.accuracy}<small>%</small>
+        <div className="results-main">
+          <div className="hero">
+            <span className="label">wpm</span>
+            <span className="num hero-value">{results.wpm}</span>
+          </div>
+          <div className="hero hero-acc">
+            <span className="label">accuracy</span>
+            <span className="num hero-value-sm">
+              {results.accuracy}
+              <span className="hero-unit">%</span>
             </span>
-            <span className="stat-label">accuracy</span>
           </div>
-          <div className="stat-card">
-            <span className="stat-value">{results.rawWpm}</span>
-            <span className="stat-label">raw wpm</span>
-          </div>
-          <div className="stat-card">
-            <span className="stat-value">{results.totalChars}</span>
-            <span className="stat-label">characters</span>
-          </div>
-          <div className="stat-card">
-            <span className="stat-value">
-              {results.consistency}<small>%</small>
-            </span>
-            <span className="stat-label">consistency</span>
-          </div>
+          <dl className="readouts">
+            <div className="readout-item">
+              <dt className="label">raw</dt>
+              <dd>{results.rawWpm}</dd>
+            </div>
+            <div className="readout-item">
+              <dt className="label">consistency</dt>
+              <dd>{results.consistency === null ? "—" : `${results.consistency}%`}</dd>
+            </div>
+            <div className="readout-item">
+              <dt className="label">time</dt>
+              <dd>{timeTaken}s</dd>
+            </div>
+            <div
+              className="readout-item"
+              title="correct / incorrect / extra / missed"
+            >
+              <dt className="label">characters</dt>
+              <dd>
+                {results.correctChars}
+                <i>/</i>
+                <span className={results.incorrectChars ? "bad" : ""}>
+                  {results.incorrectChars}
+                </span>
+                <i>/</i>
+                {results.extraChars}
+                <i>/</i>
+                {results.missedChars}
+              </dd>
+            </div>
+          </dl>
         </div>
 
-        <div className="chart-card">
-          <canvas ref={canvasRef} />
-        </div>
+        {data.length > 0 && (
+          <div className="rhythm">
+            <div className="rhythm-head">
+              <span className="label">rhythm</span>
+              <div className="rhythm-legend">
+                <span><i className="sw bar" />speed each second</span>
+                <span><i className="sw line" />average</span>
+                <span><i className="sw err" />errors</span>
+              </div>
+            </div>
+            <div
+              className="rhythm-chart"
+              onMouseMove={handleMove}
+              onMouseLeave={handleLeave}
+            >
+              <canvas ref={canvasRef} />
+              {hovered && (
+                <div
+                  className="chart-tip"
+                  style={{ left: hover.x }}
+                >
+                  <span className="chart-tip-title">second {hovered.second}</span>
+                  <span>
+                    <b>{hovered.burst ?? hovered.wpm}</b> wpm
+                  </span>
+                  <span>avg {hovered.wpm}</span>
+                  {hovered.errors > 0 && (
+                    <span className="bad">
+                      {hovered.errors} error{hovered.errors > 1 ? "s" : ""}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="results-footer">
-          <div className="char-breakdown">
-            <span className="char-stat">
-              <span className="dot correct" />
-              {results.correctChars} correct
-            </span>
-            <span className="char-stat">
-              <span className="dot incorrect" />
-              {results.incorrectChars} incorrect
-            </span>
-            <span className="char-stat">
-              <span className="dot extra" />
-              {results.extraChars} extra
-            </span>
-            <span className="char-stat">
-              <span className="dot missed" />
-              {results.missedChars} missed
-            </span>
+          <div className="results-meta">
+            {isLoggedIn && saveStatus ? (
+              <span className={`save-status ${saveStatus}`}>
+                <span className={`led ${saveStatus === "saved" ? "on" : ""}`} />
+                {saveStatus === "saving" && "saving"}
+                {saveStatus === "saved" && "saved to profile"}
+                {saveStatus === "error" && "couldn't save"}
+              </span>
+            ) : (
+              !isLoggedIn && <span className="save-status">sign in to keep your history</span>
+            )}
+            <button className="text-btn" onClick={handleCopy} tabIndex={-1}>
+              {copied ? "copied" : "copy result"}
+            </button>
           </div>
 
-          {isLoggedIn && saveStatus && (
-            <span className={`save-status ${saveStatus}`}>
-              {saveStatus === "saving" && "saving..."}
-              {saveStatus === "saved" && "result saved"}
-              {saveStatus === "error" && "save failed"}
+          <div className="results-actions">
+            <span className="results-kbd">
+              <kbd>tab</kbd>
+              <kbd>enter</kbd>
             </span>
-          )}
-
-          <button className="restart-btn" onClick={onRestart} tabIndex={-1}>
-            try again
-          </button>
+            <button className="btn btn-primary restart-btn" onClick={onRestart} tabIndex={-1}>
+              next test
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                <path d="M2 7h9.5M8 3.5L11.5 7 8 10.5" stroke="currentColor" strokeWidth="1.5" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
     </div>

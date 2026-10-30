@@ -1,4 +1,11 @@
 import { useState, useCallback, useRef, useEffect } from "react";
+import {
+  wpmFrom,
+  classifyInsert,
+  countNetChars,
+  charBreakdown,
+  consistencyOf,
+} from "../utils/scoring";
 
 /**
  * A variant of useTypingTest designed for races.
@@ -9,6 +16,8 @@ import { useState, useCallback, useRef, useEffect } from "react";
  * Supports two test types:
  * - "time": countdown timer, test ends when time runs out
  * - "wordcount": count-up timer, test ends when enough words are typed
+ *
+ * Scoring matches solo tests (see utils/scoring.js).
  */
 export function useRaceTypingTest(raceWords, raceDuration, raceTestType = "time", raceWordCount = 25) {
   const [words, setWords] = useState(raceWords || []);
@@ -19,15 +28,18 @@ export function useRaceTypingTest(raceWords, raceDuration, raceTestType = "time"
   const [isFinished, setIsFinished] = useState(false);
   const [timeLeft, setTimeLeft] = useState(raceDuration || 30);
   const [elapsedTime, setElapsedTime] = useState(0);
-  const [wpmHistory, setWpmHistory] = useState([]);
   const [liveWpm, setLiveWpm] = useState(0);
 
-  const startTimeRef = useRef(null);
+  const startTimeRef = useRef(null); // performance.now()
+  const endTimeRef = useRef(null);
+  const finishedRef = useRef(false);
   const timerRef = useRef(null);
-  const lastRecordedSecond = useRef(0);
+  const deadlineRef = useRef(null);
   const canTypeRef = useRef(false);
+  const keysRef = useRef({ correct: 0, incorrect: 0 });
+  const lastPointRef = useRef({ at: 0, second: 0, keys: 0 });
+  const historyRef = useRef([]);
 
-  // Refs for latest state
   const wordsRef = useRef(words);
   const typedWordsRef = useRef(typedWords);
   const currentInputRef = useRef(currentInput);
@@ -37,6 +49,10 @@ export function useRaceTypingTest(raceWords, raceDuration, raceTestType = "time"
   typedWordsRef.current = typedWords;
   currentInputRef.current = currentInput;
   currentWordIndexRef.current = currentWordIndex;
+
+  const dur = raceDuration || 30;
+  const isWordCount = raceTestType === "wordcount";
+  const lastIndex = isWordCount ? raceWordCount - 1 : Infinity;
 
   // Sync words when race data arrives
   useEffect(() => {
@@ -49,121 +65,154 @@ export function useRaceTypingTest(raceWords, raceDuration, raceTestType = "time"
     if (raceDuration) setTimeLeft(raceDuration);
   }, [raceDuration]);
 
-  const countCorrectChars = useCallback(() => {
-    const tw = typedWordsRef.current;
-    const w = wordsRef.current;
-    const ci = currentInputRef.current;
-    const cwi = currentWordIndexRef.current;
+  const netChars = useCallback(
+    () =>
+      countNetChars(
+        wordsRef.current,
+        typedWordsRef.current,
+        currentInputRef.current,
+        currentWordIndexRef.current,
+        lastIndex
+      ),
+    [lastIndex]
+  );
 
-    let correct = 0;
-    for (let i = 0; i < tw.length; i++) {
-      const word = w[i];
-      const typed = tw[i];
-      if (!word || !typed) continue;
-      for (let j = 0; j < word.length && j < typed.length; j++) {
-        if (typed[j] === word[j]) correct++;
+  const recordPoint = useCallback(
+    (elapsed, second) => {
+      const last = lastPointRef.current;
+      const span = elapsed - last.at;
+      if (span <= 0) return;
+      const keys = keysRef.current.correct + keysRef.current.incorrect;
+      historyRef.current = [
+        ...historyRef.current,
+        {
+          second,
+          wpm: Math.floor(wpmFrom(netChars(), elapsed)),
+          burst: Math.floor(wpmFrom(keys - last.keys, span)),
+        },
+      ];
+      lastPointRef.current = { at: elapsed, second, keys };
+    },
+    [netChars]
+  );
+
+  const finish = useCallback(
+    (endTime) => {
+      if (finishedRef.current) return;
+      finishedRef.current = true;
+      canTypeRef.current = false;
+      endTimeRef.current = endTime;
+      clearInterval(timerRef.current);
+      clearTimeout(deadlineRef.current);
+
+      const elapsed = (endTime - startTimeRef.current) / 1000;
+      if (!isWordCount) {
+        if (lastPointRef.current.second < Math.floor(elapsed)) recordPoint(elapsed, Math.floor(elapsed));
+      } else if (elapsed - lastPointRef.current.at >= 0.5) {
+        recordPoint(elapsed, Math.round(elapsed * 10) / 10);
       }
-      correct++; // space
-    }
-    const currentWord = w[cwi];
-    if (currentWord && ci) {
-      for (let j = 0; j < currentWord.length && j < ci.length; j++) {
-        if (ci[j] === currentWord[j]) correct++;
-      }
-    }
-    return correct;
-  }, []);
+      setElapsedTime(Math.round(elapsed * 10) / 10);
+      setIsRunning(false);
+      setIsFinished(true);
+    },
+    [isWordCount, recordPoint]
+  );
 
-  const startTimer = useCallback(() => {
-    setIsRunning((prev) => {
-      if (prev) return prev;
-      startTimeRef.current = Date.now();
-      lastRecordedSecond.current = 0;
-      canTypeRef.current = true;
-      return true;
-    });
-  }, []);
-
-  // Timer tick
+  // Timer tick + exact deadline
   useEffect(() => {
     if (!isRunning) return;
+    const deadline = startTimeRef.current + dur * 1000;
 
     timerRef.current = setInterval(() => {
-      const elapsed = (Date.now() - startTimeRef.current) / 1000;
+      if (finishedRef.current) return;
+      const now = performance.now();
+      if (!isWordCount && now >= deadline) {
+        finish(deadline);
+        return;
+      }
+      const elapsed = (now - startTimeRef.current) / 1000;
+      const second = Math.floor(elapsed);
+      if (elapsed >= 1) setLiveWpm(Math.floor(wpmFrom(netChars(), elapsed)));
+      if (second > lastPointRef.current.second) recordPoint(elapsed, second);
 
-      if (raceTestType === "wordcount") {
-        // Count up mode
-        setElapsedTime(Math.floor(elapsed));
-        setTimeLeft(Math.floor(elapsed)); // display elapsed time
+      if (isWordCount) {
+        setElapsedTime(second);
+        setTimeLeft(second); // display elapsed time
       } else {
-        // Count down mode
-        const dur = raceDuration || 30;
-        const remaining = Math.max(0, dur - Math.floor(elapsed));
-        setTimeLeft(remaining);
-      }
-
-      const currentSecond = Math.floor(elapsed);
-      const maxSecond = raceTestType === "wordcount" ? Infinity : (raceDuration || 30);
-      if (currentSecond > lastRecordedSecond.current && currentSecond <= maxSecond) {
-        const correctChars = countCorrectChars();
-        const wpm = elapsed > 0 ? Math.round((correctChars / 5) / (elapsed / 60)) : 0;
-        setWpmHistory((prev) => [...prev, { second: currentSecond, wpm }]);
-        setLiveWpm(wpm);
-        lastRecordedSecond.current = currentSecond;
-      }
-
-      // Time mode: end when time runs out
-      if (raceTestType !== "wordcount") {
-        const dur = raceDuration || 30;
-        const remaining = Math.max(0, dur - Math.floor(elapsed));
-        if (remaining <= 0) {
-          clearInterval(timerRef.current);
-          canTypeRef.current = false;
-          setIsRunning(false);
-          setIsFinished(true);
-        }
+        setTimeLeft(Math.max(0, dur - second));
       }
     }, 100);
 
-    return () => clearInterval(timerRef.current);
-  }, [isRunning, raceDuration, raceTestType, countCorrectChars]);
-
-  // Word count mode: check if we've typed enough words
-  useEffect(() => {
-    if (raceTestType === "wordcount" && isRunning && currentWordIndex >= raceWordCount) {
-      clearInterval(timerRef.current);
-      canTypeRef.current = false;
-      setIsRunning(false);
-      setIsFinished(true);
-      // Capture final elapsed time
-      if (startTimeRef.current) {
-        setElapsedTime(Math.round((Date.now() - startTimeRef.current) / 1000 * 10) / 10);
-      }
+    if (!isWordCount) {
+      deadlineRef.current = setTimeout(() => finish(deadline), Math.max(0, deadline - performance.now()));
     }
-  }, [currentWordIndex, raceTestType, raceWordCount, isRunning]);
+
+    return () => {
+      clearInterval(timerRef.current);
+      clearTimeout(deadlineRef.current);
+    };
+  }, [isRunning, dur, isWordCount, finish, netChars, recordPoint]);
 
   const handleInput = useCallback(
     (value) => {
-      if (isFinished || !canTypeRef.current || !isRunning) return;
-
-      if (value.endsWith(" ")) {
-        const input = currentInputRef.current;
-        if (input.length > 0) {
-          const idx = currentWordIndexRef.current;
-          setTypedWords((prev) => {
-            const next = [...prev];
-            next[idx] = input;
-            return next;
-          });
-          setCurrentWordIndex((prev) => prev + 1);
-          setCurrentInput("");
-        }
+      if (finishedRef.current || !canTypeRef.current) return;
+      const now = performance.now();
+      if (!isWordCount && now - startTimeRef.current >= dur * 1000) {
+        finish(startTimeRef.current + dur * 1000);
         return;
       }
 
+      const idx = currentWordIndexRef.current;
+      const target = wordsRef.current[idx] || "";
+      const prev = currentInputRef.current;
+      const tally = (next) => {
+        const { correct, incorrect } = classifyInsert(prev, next, target);
+        keysRef.current.correct += correct;
+        keysRef.current.incorrect += incorrect;
+      };
+
+      if (value.endsWith(" ")) {
+        const word = value.slice(0, -1);
+        if (word.length === 0) return;
+        tally(word);
+        if (word === target) keysRef.current.correct++;
+        else keysRef.current.incorrect++;
+
+        const typed = [...typedWordsRef.current];
+        typed[idx] = word;
+        typedWordsRef.current = typed;
+        setTypedWords(typed);
+
+        const nextIndex = idx + 1;
+        currentWordIndexRef.current = nextIndex;
+        currentInputRef.current = "";
+        setCurrentWordIndex(nextIndex);
+        setCurrentInput("");
+
+        if (isWordCount && nextIndex >= raceWordCount) finish(now);
+        return;
+      }
+
+      tally(value);
+
+      // Word-count races end the moment the last word is typed correctly
+      if (isWordCount && idx === raceWordCount - 1 && value === target) {
+        const typed = [...typedWordsRef.current];
+        typed[idx] = value;
+        typedWordsRef.current = typed;
+        currentWordIndexRef.current = idx + 1;
+        currentInputRef.current = "";
+        setTypedWords(typed);
+        setCurrentWordIndex(idx + 1);
+        setCurrentInput("");
+        finish(now);
+        return;
+      }
+
+      currentInputRef.current = value;
       setCurrentInput(value);
     },
-    [isFinished, isRunning]
+    [isWordCount, dur, raceWordCount, finish]
   );
 
   const goToPrevWord = useCallback(() => {
@@ -172,6 +221,8 @@ export function useRaceTypingTest(raceWords, raceDuration, raceTestType = "time"
     if (idx > 0 && input === "") {
       const prevIndex = idx - 1;
       const prevTyped = typedWordsRef.current[prevIndex] || "";
+      currentWordIndexRef.current = prevIndex;
+      currentInputRef.current = prevTyped;
       setCurrentWordIndex(prevIndex);
       setCurrentInput(prevTyped);
       return prevTyped;
@@ -180,119 +231,78 @@ export function useRaceTypingTest(raceWords, raceDuration, raceTestType = "time"
   }, []);
 
   const clearCurrentWord = useCallback(() => {
+    currentInputRef.current = "";
     setCurrentInput("");
   }, []);
 
   const getResults = useCallback(() => {
-    const tw = typedWordsRef.current;
-    const w = wordsRef.current;
-    const ci = currentInputRef.current;
-    const cwi = currentWordIndexRef.current;
-
-    // For word count mode, use actual elapsed time; for time mode, use duration
-    let dur;
-    if (raceTestType === "wordcount") {
-      dur = startTimeRef.current ? (Date.now() - startTimeRef.current) / 1000 : 1;
-    } else {
-      dur = raceDuration || 30;
-    }
-
-    let correctChars = 0;
-    let incorrectChars = 0;
-    let extraChars = 0;
-    let missedChars = 0;
-    let totalTyped = 0;
-
-    for (let i = 0; i <= cwi && i < w.length; i++) {
-      const word = w[i];
-      const typed = i < cwi ? tw[i] : ci;
-      if (!typed && i === cwi) continue;
-      if (!typed) continue;
-
-      const isCompleted = i < cwi;
-
-      for (let j = 0; j < word.length; j++) {
-        if (j < typed.length) {
-          totalTyped++;
-          if (typed[j] === word[j]) correctChars++;
-          else incorrectChars++;
-        } else if (isCompleted) {
-          missedChars++;
-        }
-      }
-
-      if (typed.length > word.length) {
-        const ex = typed.length - word.length;
-        extraChars += ex;
-        totalTyped += ex;
-      }
-
-      if (isCompleted) {
-        correctChars++;
-        totalTyped++;
-      }
-    }
-
-    const minutes = dur / 60;
-    const wpm = Math.round((correctChars / 5) / minutes);
-    const rawWpm = Math.round((totalTyped / 5) / minutes);
-    const accuracy = totalTyped > 0 ? Math.round((correctChars / totalTyped) * 100) : 0;
-
-    let consistency = 0;
-    if (wpmHistory.length > 1) {
-      const wpms = wpmHistory.map((h) => h.wpm);
-      const mean = wpms.reduce((a, b) => a + b, 0) / wpms.length;
-      const variance = wpms.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / wpms.length;
-      const stdDev = Math.sqrt(variance);
-      const cv = mean > 0 ? (stdDev / mean) * 100 : 100;
-      consistency = Math.max(0, Math.round(100 - cv));
-    }
+    const seconds = isWordCount
+      ? ((endTimeRef.current ?? performance.now()) - startTimeRef.current) / 1000
+      : dur;
+    const args = [
+      wordsRef.current,
+      typedWordsRef.current,
+      currentInputRef.current,
+      currentWordIndexRef.current,
+      lastIndex,
+    ];
+    const chars = charBreakdown(...args);
+    const { correct, incorrect } = keysRef.current;
+    const keys = correct + incorrect;
+    const consistency = consistencyOf(historyRef.current.map((h) => h.burst));
 
     return {
-      wpm,
-      rawWpm,
-      accuracy,
-      consistency,
-      correctChars,
-      incorrectChars,
-      extraChars,
-      missedChars,
-      totalChars: correctChars + incorrectChars + extraChars,
-      wpmHistory,
-      wordsTyped: cwi,
-      elapsedTime: Math.round(dur * 10) / 10,
+      wpm: Math.floor(wpmFrom(countNetChars(...args), seconds)),
+      rawWpm: Math.floor(wpmFrom(keys, seconds)),
+      accuracy: keys > 0 ? Math.floor((correct / keys) * 100) : 0,
+      consistency: consistency === null ? null : Math.floor(consistency),
+      correctChars: chars.correct,
+      incorrectChars: chars.incorrect,
+      extraChars: chars.extra,
+      missedChars: chars.missed,
+      totalChars: chars.correct + chars.incorrect + chars.extra,
+      wpmHistory: historyRef.current,
+      wordsTyped: Math.min(currentWordIndexRef.current, isWordCount ? raceWordCount : Infinity),
+      elapsedTime: Math.round(seconds * 10) / 10,
     };
-  }, [raceDuration, raceTestType, wpmHistory]);
+  }, [isWordCount, dur, lastIndex, raceWordCount]);
 
   // Allow race to enable typing AND start the timer (after countdown)
   const enableTyping = useCallback(() => {
     canTypeRef.current = true;
-    startTimeRef.current = Date.now();
-    lastRecordedSecond.current = 0;
+    finishedRef.current = false;
+    startTimeRef.current = performance.now();
+    lastPointRef.current = { at: 0, second: 0, keys: 0 };
     setElapsedTime(0);
     setIsRunning(true);
   }, []);
 
   const reset = useCallback(() => {
     clearInterval(timerRef.current);
+    clearTimeout(deadlineRef.current);
     setTypedWords([]);
     setCurrentInput("");
     setCurrentWordIndex(0);
     setIsRunning(false);
     setIsFinished(false);
-    setTimeLeft(raceTestType === "wordcount" ? 0 : (raceDuration || 30));
+    setTimeLeft(raceTestType === "wordcount" ? 0 : raceDuration || 30);
     setElapsedTime(0);
-    setWpmHistory([]);
     setLiveWpm(0);
+    typedWordsRef.current = [];
+    currentInputRef.current = "";
+    currentWordIndexRef.current = 0;
     startTimeRef.current = null;
-    lastRecordedSecond.current = 0;
+    endTimeRef.current = null;
+    finishedRef.current = false;
     canTypeRef.current = false;
+    keysRef.current = { correct: 0, incorrect: 0 };
+    lastPointRef.current = { at: 0, second: 0, keys: 0 };
+    historyRef.current = [];
   }, [raceDuration, raceTestType]);
 
-  // Compute live accuracy
-  const correctChars = countCorrectChars();
-  const totalCharsTyped = typedWords.reduce((s, w) => s + (w ? w.length + 1 : 0), 0) + currentInput.length;
-  const liveAccuracy = totalCharsTyped > 0 ? Math.round((correctChars / totalCharsTyped) * 100) : 100;
+  // Keystroke accuracy so far
+  const { correct, incorrect } = keysRef.current;
+  const liveAccuracy = correct + incorrect > 0 ? Math.floor((correct / (correct + incorrect)) * 100) : 100;
 
   return {
     words,

@@ -1,12 +1,55 @@
+import { useState, useRef, useEffect } from "react";
 import "./Settings.css";
 
 const MODES = [
-  { key: "words", label: "words" },
-  { key: "sentences", label: "sentences" },
+  { key: "words", label: "words", hint: "common english words" },
+  { key: "sentences", label: "sentences", hint: "real passages, with punctuation" },
 ];
 
 const DURATIONS = [15, 30, 60, 120];
 const WORD_COUNTS = [10, 25, 50, 100];
+
+function Token({ label, title, children }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => {
+      if (!ref.current?.contains(e.target)) setOpen(false);
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div className="token-wrap" ref={ref}>
+      <button
+        className={`token ${open ? "open" : ""}`}
+        onClick={() => setOpen((o) => !o)}
+        tabIndex={-1}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        title={title}
+      >
+        {label}
+        <span className="token-caret" aria-hidden="true" />
+      </button>
+      {open && (
+        <div className="token-pop" role="menu">
+          {children(() => setOpen(false))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Settings({
   mode,
@@ -15,95 +58,106 @@ export default function Settings({
   wordCountTarget,
   punctuation,
   numbers,
-  soundEnabled,
   onModeChange,
   onDurationChange,
   onWordCountChange,
   onTogglePunctuation,
   onToggleNumbers,
-  onToggleSound,
-  faded,
 }) {
-  const modifiersDimmed = mode !== "words";
+  const modifiersDisabled = mode !== "words";
+  const lengthLabel =
+    testType === "time" ? `${duration} seconds` : `${wordCountTarget} words`;
 
   return (
-    <div className={`settings ${faded ? "faded" : ""}`}>
-      <div className="settings-group">
-        {MODES.map((m) => (
-          <button
-            key={m.key}
-            className={mode === m.key ? "active" : ""}
-            onClick={() => onModeChange(m.key)}
-            tabIndex={-1}
-          >
-            {m.label}
-          </button>
-        ))}
+    <div className="settings">
+      <div className="spec">
+        <Token label={mode} title="text">
+          {(close) =>
+            MODES.map((m) => (
+              <button
+                key={m.key}
+                role="menuitemradio"
+                aria-checked={mode === m.key}
+                className={`pop-row ${mode === m.key ? "active" : ""}`}
+                onClick={() => {
+                  onModeChange(m.key);
+                  close();
+                }}
+                tabIndex={-1}
+              >
+                <span className="pop-row-name">{m.label}</span>
+                <span className="pop-row-hint">{m.hint}</span>
+              </button>
+            ))
+          }
+        </Token>
+
+        <span className="spec-sep" aria-hidden="true">/</span>
+
+        <Token label={lengthLabel} title="length">
+          {(close) => (
+            <div className="pop-grid">
+              <span className="label pop-grid-label">seconds</span>
+              <div className="pop-cells">
+                {DURATIONS.map((d) => (
+                  <button
+                    key={`t${d}`}
+                    role="menuitemradio"
+                    aria-checked={testType === "time" && duration === d}
+                    className={`pop-cell ${testType === "time" && duration === d ? "active" : ""}`}
+                    onClick={() => {
+                      onDurationChange(d);
+                      close();
+                    }}
+                    tabIndex={-1}
+                  >
+                    {d}
+                  </button>
+                ))}
+              </div>
+              <span className="label pop-grid-label">words</span>
+              <div className="pop-cells">
+                {WORD_COUNTS.map((c) => (
+                  <button
+                    key={`w${c}`}
+                    role="menuitemradio"
+                    aria-checked={testType === "wordcount" && wordCountTarget === c}
+                    className={`pop-cell ${testType === "wordcount" && wordCountTarget === c ? "active" : ""}`}
+                    onClick={() => {
+                      onWordCountChange(c);
+                      close();
+                    }}
+                    tabIndex={-1}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </Token>
       </div>
 
-      <span className="sep" aria-hidden="true">·</span>
-
-      <div className="settings-group">
+      <div className={`mods ${modifiersDisabled ? "disabled" : ""}`}>
         <button
-          className={`${punctuation ? "active" : ""} ${modifiersDimmed ? "dimmed" : ""}`}
+          className="mod"
           onClick={onTogglePunctuation}
           tabIndex={-1}
-          title="add punctuation (words mode)"
+          aria-pressed={punctuation}
+          title={modifiersDisabled ? "only applies to words mode" : "capitals and punctuation"}
         >
-          !?
+          <span className={`led ${punctuation && !modifiersDisabled ? "on" : ""}`} />
+          punctuation
         </button>
         <button
-          className={`${numbers ? "active" : ""} ${modifiersDimmed ? "dimmed" : ""}`}
+          className="mod"
           onClick={onToggleNumbers}
           tabIndex={-1}
-          title="add numbers (words mode)"
+          aria-pressed={numbers}
+          title={modifiersDisabled ? "only applies to words mode" : "mix in numbers"}
         >
-          123
-        </button>
-      </div>
-
-      <span className="sep" aria-hidden="true">·</span>
-
-      <div className="settings-group">
-        <span className="settings-group-label">time</span>
-        {DURATIONS.map((d) => (
-          <button
-            key={`t${d}`}
-            className={testType === "time" && duration === d ? "active" : ""}
-            onClick={() => onDurationChange(d)}
-            tabIndex={-1}
-          >
-            {d}
-          </button>
-        ))}
-      </div>
-
-      <span className="sep" aria-hidden="true">·</span>
-
-      <div className="settings-group">
-        <span className="settings-group-label">words</span>
-        {WORD_COUNTS.map((c) => (
-          <button
-            key={`w${c}`}
-            className={testType === "wordcount" && wordCountTarget === c ? "active" : ""}
-            onClick={() => onWordCountChange(c)}
-            tabIndex={-1}
-          >
-            {c}
-          </button>
-        ))}
-      </div>
-
-      <span className="sep" aria-hidden="true">·</span>
-
-      <div className="settings-group">
-        <button
-          className={soundEnabled ? "active" : ""}
-          onClick={onToggleSound}
-          tabIndex={-1}
-          title="typing sounds"
-        >
-          sound
+          <span className={`led ${numbers && !modifiersDisabled ? "on" : ""}`} />
+          numbers
         </button>
       </div>
     </div>

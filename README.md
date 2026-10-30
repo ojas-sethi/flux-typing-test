@@ -4,14 +4,15 @@ A minimalist typing test that gets out of your way. Built with React + Vite, bac
 
 ## Features
 
-- **Test modes** — random common words or full sentences, timed (15/30/60/120s) or word-count (10/25/50/100) tests
+- **Test modes** — random common words or full sentences, timed (15/30/60/120s) or word-count (10/25/50/100) tests, picked from a one-line spec ("words / 30 seconds")
 - **Punctuation & numbers** — optional toggles to mix capitalization, punctuation, and digits into words mode
-- **Live feedback** — smooth caret, per-letter coloring, live WPM while you type, caps lock warning
+- **Live ruler** — a tick ruler tracks progress; each finished second (or word) grows into a bar showing how fast you typed it
+- **Live feedback** — smooth caret, per-letter coloring, live WPM, caps lock warning
 - **Typing sounds** — subtle synthesized mechanical "klack" on each keystroke with an error thud (toggleable, no audio assets)
-- **Rich results** — WPM, raw WPM, accuracy, consistency, per-second WPM + raw chart, character breakdown
-- **Personal bests** — tracked per test configuration, with a celebration when you beat one
-- **Accounts & profiles** — Google sign-in, usernames, bios, test history, stats and progression charts
-- **Social** — add friends and race head-to-head in real time
+- **Results** — WPM, accuracy, raw, consistency, character breakdown, a per-second rhythm chart with error marks and hover details, copy-to-clipboard
+- **Personal bests** — tracked per test configuration, with a callout when you beat one
+- **Profile** — one filter (all / words / sentences / races) drives headline stats, a full history chart, a personal-best matrix and a test log
+- **Social** — add friends, view their stats, and race head-to-head in real time with shareable room codes
 - **Dark & light themes**, settings persisted across sessions
 
 ## Keyboard shortcuts

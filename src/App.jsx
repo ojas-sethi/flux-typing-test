@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useTypingTest } from "./hooks/useTypingTest";
 import { useTheme } from "./hooks/useTheme";
 import { useAuth } from "./hooks/useAuth";
@@ -10,6 +10,7 @@ import Profile from "./components/Profile";
 import UsernameSetup from "./components/UsernameSetup";
 import Social from "./components/Social";
 import Race from "./components/Race";
+import Ruler from "./components/Ruler";
 import "./App.css";
 
 export default function App() {
@@ -23,6 +24,8 @@ export default function App() {
     punctuation,
     numbers,
     liveWpm,
+    wpmHistory,
+    wordSpeeds,
     togglePunctuation,
     toggleNumbers,
     words,
@@ -32,7 +35,6 @@ export default function App() {
     isRunning,
     isFinished,
     timeLeft,
-    elapsedTime,
     handleInput,
     goToPrevWord,
     clearCurrentWord,
@@ -157,13 +159,16 @@ export default function App() {
     };
   }, []);
 
-  const progress = isRunning
-    ? testType === "time"
-      ? (timeLeft / duration) * 100
-      : (currentWordIndex / wordCountTarget) * 100
-    : testType === "time"
-      ? 100
-      : 0;
+  // Ruler: units are seconds (time) or words (word count)
+  const rulerTotal = testType === "time" ? duration : wordCountTarget;
+  const rulerValue =
+    testType === "time" ? duration - timeLeft : Math.min(currentWordIndex, wordCountTarget);
+  const rulerSpeeds = useMemo(() => {
+    if (testType !== "time") return wordSpeeds;
+    const arr = [];
+    for (const h of wpmHistory) arr[h.second - 1] = h.burst ?? h.wpm;
+    return arr;
+  }, [testType, wpmHistory, wordSpeeds]);
 
   const handleSignOut = useCallback(() => {
     signOut();
@@ -172,120 +177,153 @@ export default function App() {
 
   return (
     <>
-      {/* Progress bar timer */}
-      <div className={`progress-bar ${isRunning ? "active" : ""}`}>
-        <div className="progress-fill" style={{ width: `${progress}%` }} />
-      </div>
-
       <div className="app">
-        <header className={isRunning ? "faded" : ""}>
-          <div className="logo">
-            klacks<span className="logo-mark">*</span>
+        <header className={`app-header ${isRunning ? "faded" : ""}`}>
+          <div className="logo" aria-label="klacks">
+            klacks<span className="logo-caret" aria-hidden="true" />
           </div>
           <nav className="header-actions">
-            {!authLoading &&
-              (user ? (
-                <>
-                  <button
-                    className="nav-link"
-                    onClick={() => setRaceVisible(true)}
-                    tabIndex={-1}
-                  >
-                    race
-                  </button>
-                  <button
-                    className="nav-link"
-                    onClick={() => setSocialVisible(true)}
-                    tabIndex={-1}
-                  >
-                    friends
-                  </button>
-                  <button
-                    className="auth-avatar"
-                    onClick={() => setProfileVisible(true)}
-                    tabIndex={-1}
-                    aria-label="Profile"
-                  >
-                    {user.photoURL ? (
-                      <img
-                        src={user.photoURL}
-                        alt=""
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <span className="avatar-fallback">
-                        {(user.displayName || user.email || "?")[0].toUpperCase()}
-                      </span>
-                    )}
-                  </button>
-                </>
-              ) : (
-                <button className="nav-link" onClick={signIn} tabIndex={-1}>
-                  sign in
+            {!authLoading && user && (
+              <>
+                <button className="nav-link" onClick={() => setRaceVisible(true)} tabIndex={-1}>
+                  race
                 </button>
-              ))}
+                <button className="nav-link" onClick={() => setSocialVisible(true)} tabIndex={-1}>
+                  friends
+                </button>
+              </>
+            )}
+            {!authLoading && user && <span className="nav-rule" aria-hidden="true" />}
             <button
-              className="theme-toggle"
+              className={`icon-btn ${soundEnabled ? "on" : ""}`}
+              onClick={toggleSound}
+              tabIndex={-1}
+              aria-label={soundEnabled ? "Turn typing sounds off" : "Turn typing sounds on"}
+              aria-pressed={soundEnabled}
+              title={soundEnabled ? "sound on" : "sound off"}
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M2.5 6v4h2.5l3.5 3V3L5 6H2.5z" fill="currentColor" />
+                {soundEnabled ? (
+                  <path d="M11 5.5c.9.7 1.4 1.5 1.4 2.5s-.5 1.8-1.4 2.5M12.8 3.6c1.4 1.1 2.2 2.6 2.2 4.4s-.8 3.3-2.2 4.4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                ) : (
+                  <path d="M11 6l3.5 4M14.5 6L11 10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                )}
+              </svg>
+            </button>
+            <button
+              className="icon-btn"
               onClick={toggleTheme}
               tabIndex={-1}
               aria-label="Toggle theme"
               title={theme === "dark" ? "light mode" : "dark mode"}
             >
-              ◐
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.3" />
+                <path d="M8 2a6 6 0 0 1 0 12z" fill="currentColor" />
+              </svg>
             </button>
+            {!authLoading &&
+              (user ? (
+                <button
+                  className="auth-avatar"
+                  onClick={() => setProfileVisible(true)}
+                  tabIndex={-1}
+                  aria-label="Profile"
+                >
+                  {user.photoURL ? (
+                    <img src={user.photoURL} alt="" referrerPolicy="no-referrer" />
+                  ) : (
+                    <span className="avatar-fallback">
+                      {(user.displayName || user.email || "?")[0].toUpperCase()}
+                    </span>
+                  )}
+                </button>
+              ) : (
+                <button className="sign-in" onClick={signIn} tabIndex={-1}>
+                  sign in
+                </button>
+              ))}
           </nav>
         </header>
 
         <main className="main-content">
-          <div className={`type-meta ${isRunning ? "running" : ""}`}>
-            <span className="type-meta-left">
-              {isRunning
-                ? testType === "time"
-                  ? timeLeft
-                  : `${Math.min(currentWordIndex, wordCountTarget)} / ${wordCountTarget}`
-                : `${mode} — ${testType === "time" ? `${duration}s` : `${wordCountTarget} words`}`}
-            </span>
-            <span className={`type-meta-right ${isRunning && liveWpm > 0 ? "visible" : ""}`}>
-              {liveWpm} wpm
-            </span>
-          </div>
+          <div className="deck">
+            <div className="deck-top">
+              {isRunning ? (
+                <div className="readout">
+                  <div className="readout-cell">
+                    <span className="num readout-value accent">
+                      {testType === "time"
+                        ? timeLeft
+                        : `${Math.min(currentWordIndex, wordCountTarget)}`}
+                    </span>
+                    <span className="label">
+                      {testType === "time" ? "seconds left" : `of ${wordCountTarget} words`}
+                    </span>
+                  </div>
+                  <div className={`readout-cell right ${liveWpm > 0 ? "" : "pending"}`}>
+                    <span className="num readout-value">{liveWpm || "—"}</span>
+                    <span className="label">wpm</span>
+                  </div>
+                </div>
+              ) : (
+                <Settings
+                  mode={mode}
+                  testType={testType}
+                  duration={duration}
+                  wordCountTarget={wordCountTarget}
+                  punctuation={punctuation}
+                  numbers={numbers}
+                  onModeChange={changeMode}
+                  onDurationChange={changeDuration}
+                  onWordCountChange={changeWordCount}
+                  onTogglePunctuation={togglePunctuation}
+                  onToggleNumbers={toggleNumbers}
+                />
+              )}
+            </div>
 
-          <div className="typing-stage">
-            <TypingArea
-              words={words}
-              typedWords={typedWords}
-              currentInput={currentInput}
-              currentWordIndex={currentWordIndex}
-              isRunning={isRunning}
-              isFinished={isFinished}
-              disabled={needsUsername || profileVisible || socialVisible || raceVisible}
-              soundEnabled={soundEnabled}
-              onInput={handleInput}
-              onGoToPrevWord={goToPrevWord}
-              onClearCurrentWord={clearCurrentWord}
+            <Ruler
+              total={rulerTotal}
+              value={rulerValue}
+              speeds={rulerSpeeds}
+              running={isRunning}
             />
-          </div>
 
-          <Settings
-            mode={mode}
-            testType={testType}
-            duration={duration}
-            wordCountTarget={wordCountTarget}
-            punctuation={punctuation}
-            numbers={numbers}
-            soundEnabled={soundEnabled}
-            onModeChange={changeMode}
-            onDurationChange={changeDuration}
-            onWordCountChange={changeWordCount}
-            onTogglePunctuation={togglePunctuation}
-            onToggleNumbers={toggleNumbers}
-            onToggleSound={toggleSound}
-            faded={isRunning}
-          />
+            <div className="typing-stage">
+              <TypingArea
+                words={words}
+                typedWords={typedWords}
+                currentInput={currentInput}
+                currentWordIndex={currentWordIndex}
+                isRunning={isRunning}
+                isFinished={isFinished}
+                disabled={needsUsername || profileVisible || socialVisible || raceVisible}
+                soundEnabled={soundEnabled}
+                onInput={handleInput}
+                onGoToPrevWord={goToPrevWord}
+                onClearCurrentWord={clearCurrentWord}
+              />
+            </div>
+          </div>
         </main>
 
-        <footer className={`app-footer ${isRunning ? "visible" : ""}`}>
-          <kbd>tab</kbd> + <kbd>enter</kbd> to restart
+        <footer className={`app-footer ${isRunning ? "running" : ""}`}>
+          <span className="hint">
+            <kbd>tab</kbd>
+            <kbd>enter</kbd>
+            <span>restart</span>
+          </span>
+          <span className="hint idle-only">
+            <kbd>esc</kbd>
+            <span>reset</span>
+          </span>
+          <span className="hint idle-only">
+            <kbd>ctrl</kbd>
+            <kbd>⌫</kbd>
+            <span>clear word</span>
+          </span>
         </footer>
       </div>
 

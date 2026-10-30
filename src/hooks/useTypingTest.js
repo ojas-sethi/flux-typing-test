@@ -57,9 +57,15 @@ export function useTypingTest() {
   const [wpmHistory, setWpmHistory] = useState([]);
   const [liveWpm, setLiveWpm] = useState(0);
 
+  const [wordSpeeds, setWordSpeeds] = useState([]);
+
   const startTimeRef = useRef(null);
   const timerRef = useRef(null);
   const lastRecordedSecond = useRef(0);
+  const lastCorrectRef = useRef(0);
+  const errorsRef = useRef(0);
+  const lastErrorsRef = useRef(0);
+  const lastWordTimeRef = useRef(null);
 
   // Refs to track latest state without causing effect re-runs
   const wordsRef = useRef(words);
@@ -148,39 +154,44 @@ export function useTypingTest() {
         setLiveWpm(Math.round((correctChars / 5) / (elapsed / 60)));
       }
 
-      if (testTypeRef.current === "time") {
-        // Countdown mode
-        const remaining = Math.max(0, duration - Math.floor(elapsed));
+      const isTime = testTypeRef.current === "time";
+      const currentSecond = Math.floor(elapsed);
+
+      // Record one history point per completed second
+      if (
+        currentSecond > lastRecordedSecond.current &&
+        (!isTime || currentSecond <= duration)
+      ) {
+        const correctChars = countCorrectChars();
+        const totalChars = countTotalTypedChars();
+        const span = currentSecond - lastRecordedSecond.current;
+        const wpm = Math.round((correctChars / 5) / (elapsed / 60));
+        const raw = Math.round((totalChars / 5) / (elapsed / 60));
+        // Instantaneous speed over the last second(s): correct chars × 12 = wpm
+        const burst = Math.max(
+          0,
+          Math.round(((correctChars - lastCorrectRef.current) * 12) / span)
+        );
+        const errors = errorsRef.current - lastErrorsRef.current;
+        lastCorrectRef.current = correctChars;
+        lastErrorsRef.current = errorsRef.current;
+        lastRecordedSecond.current = currentSecond;
+        setWpmHistory((prev) => [
+          ...prev,
+          { second: currentSecond, wpm, raw, burst, errors },
+        ]);
+      }
+
+      if (isTime) {
+        const remaining = Math.max(0, duration - currentSecond);
         setTimeLeft(remaining);
-
-        const currentSecond = Math.floor(elapsed);
-        if (currentSecond > lastRecordedSecond.current && currentSecond <= duration) {
-          const correctChars = countCorrectChars();
-          const totalChars = countTotalTypedChars();
-          const wpm = elapsed > 0 ? Math.round((correctChars / 5) / (elapsed / 60)) : 0;
-          const raw = elapsed > 0 ? Math.round((totalChars / 5) / (elapsed / 60)) : 0;
-          setWpmHistory((prev) => [...prev, { second: currentSecond, wpm, raw }]);
-          lastRecordedSecond.current = currentSecond;
-        }
-
         if (remaining <= 0) {
           clearInterval(timerRef.current);
           setIsRunning(false);
           setIsFinished(true);
         }
       } else {
-        // Word count mode — count up
-        setElapsedTime(Math.floor(elapsed));
-
-        const currentSecond = Math.floor(elapsed);
-        if (currentSecond > lastRecordedSecond.current) {
-          const correctChars = countCorrectChars();
-          const totalChars = countTotalTypedChars();
-          const wpm = elapsed > 0 ? Math.round((correctChars / 5) / (elapsed / 60)) : 0;
-          const raw = elapsed > 0 ? Math.round((totalChars / 5) / (elapsed / 60)) : 0;
-          setWpmHistory((prev) => [...prev, { second: currentSecond, wpm, raw }]);
-          lastRecordedSecond.current = currentSecond;
-        }
+        setElapsedTime(currentSecond);
       }
     }, 100);
 
@@ -217,6 +228,18 @@ export function useTypingTest() {
             next[idx] = input;
             return next;
           });
+
+          // Per-word speed (used by the live ruler in word-count tests)
+          const now = Date.now();
+          const since = lastWordTimeRef.current || startTimeRef.current || now;
+          const dt = Math.max(now - since, 120);
+          lastWordTimeRef.current = now;
+          setWordSpeeds((prev) => {
+            const next = [...prev];
+            next[idx] = Math.round(((input.length + 1) / 5) / (dt / 60000));
+            return next;
+          });
+
           const newIndex = idx + 1;
           setCurrentWordIndex(newIndex);
           setCurrentInput("");
@@ -232,6 +255,14 @@ export function useTypingTest() {
           }
         }
         return;
+      }
+
+      // Count error keystrokes (new character that doesn't match)
+      if (value.length > currentInputRef.current.length) {
+        const expected = wordsRef.current[currentWordIndexRef.current]?.[value.length - 1];
+        if (expected === undefined || value[value.length - 1] !== expected) {
+          errorsRef.current++;
+        }
       }
 
       setCurrentInput(value);
@@ -360,8 +391,13 @@ export function useTypingTest() {
     setElapsedTime(0);
     setWpmHistory([]);
     setLiveWpm(0);
+    setWordSpeeds([]);
     startTimeRef.current = null;
     lastRecordedSecond.current = 0;
+    lastCorrectRef.current = 0;
+    errorsRef.current = 0;
+    lastErrorsRef.current = 0;
+    lastWordTimeRef.current = null;
   }, []);
 
   // Reset
@@ -420,6 +456,8 @@ export function useTypingTest() {
     punctuation,
     numbers,
     liveWpm,
+    wpmHistory,
+    wordSpeeds,
     togglePunctuation,
     toggleNumbers,
     words,

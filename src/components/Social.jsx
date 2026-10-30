@@ -13,8 +13,29 @@ import {
   removeFriend,
   getUserProfile,
 } from "../services/firestore";
-import { computeStats, formatDuration, timeAgo } from "../utils/stats";
+import StatsView from "./StatsView";
 import "./Social.css";
+
+function Person({ person, onOpen, action }) {
+  return (
+    <li className="person">
+      <button className="person-main" onClick={onOpen}>
+        <span className="person-avatar">
+          {person.photoURL ? (
+            <img src={person.photoURL} alt="" referrerPolicy="no-referrer" />
+          ) : (
+            (person.displayName || person.username || "?")[0].toUpperCase()
+          )}
+        </span>
+        <span className="person-text">
+          <span className="person-name">{person.displayName || person.username}</span>
+          <span className="person-handle">@{person.username}</span>
+        </span>
+      </button>
+      {action}
+    </li>
+  );
+}
 
 export default function Social({ visible, user, onClose }) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -37,7 +58,6 @@ export default function Social({ visible, user, onClose }) {
 
   const searchRef = useRef(null);
   const debounceRef = useRef(null);
-  const chartRef = useRef(null);
 
   // Load friends and requests when visible
   useEffect(() => {
@@ -240,484 +260,261 @@ export default function Social({ visible, user, onClose }) {
     [outgoingRequests, incomingRequests]
   );
 
-  // Draw chart for viewed user
-  const drawChart = useCallback(() => {
-    const canvas = chartRef.current;
-    if (!canvas || viewingTests.length < 2) return;
-
-    const ctx = canvas.getContext("2d");
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    ctx.scale(dpr, dpr);
-
-    const w = rect.width;
-    const h = rect.height;
-    const pad = { top: 12, right: 12, bottom: 24, left: 36 };
-    const data = [...viewingTests].reverse();
-    const maxWpm = Math.max(...data.map((d) => d.wpm), 10);
-    const chartW = w - pad.left - pad.right;
-    const chartH = h - pad.top - pad.bottom;
-    const xScale = (i) => pad.left + (i / (data.length - 1)) * chartW;
-    const yScale = (v) => pad.top + chartH - (v / (maxWpm * 1.15)) * chartH;
-
-    const style = getComputedStyle(document.documentElement);
-    const lineColor = style.getPropertyValue("--chart-line").trim();
-    const gridColor = style.getPropertyValue("--chart-grid").trim();
-    const textColor = style.getPropertyValue("--text-secondary").trim();
-
-    ctx.strokeStyle = gridColor;
-    ctx.lineWidth = 0.5;
-    for (let i = 0; i <= 3; i++) {
-      const y = pad.top + (i / 3) * chartH;
-      ctx.beginPath();
-      ctx.moveTo(pad.left, y);
-      ctx.lineTo(w - pad.right, y);
-      ctx.stroke();
-      ctx.fillStyle = textColor;
-      ctx.font = "9px 'IBM Plex Mono', monospace";
-      ctx.textAlign = "right";
-      ctx.fillText(Math.round(maxWpm * 1.15 * (1 - i / 3)), pad.left - 8, y + 3);
-    }
-
-    ctx.beginPath();
-    ctx.strokeStyle = lineColor;
-    ctx.lineWidth = 2;
-    ctx.lineJoin = "round";
-    ctx.lineCap = "round";
-    data.forEach((d, i) => {
-      const x = xScale(i);
-      const y = yScale(d.wpm);
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    });
-    ctx.stroke();
-
-    const gradient = ctx.createLinearGradient(0, pad.top, 0, pad.top + chartH);
-    gradient.addColorStop(0, lineColor + "20");
-    gradient.addColorStop(1, lineColor + "00");
-    ctx.lineTo(xScale(data.length - 1), pad.top + chartH);
-    ctx.lineTo(xScale(0), pad.top + chartH);
-    ctx.closePath();
-    ctx.fillStyle = gradient;
-    ctx.fill();
-
-    data.forEach((d, i) => {
-      ctx.beginPath();
-      ctx.arc(xScale(i), yScale(d.wpm), 3, 0, Math.PI * 2);
-      ctx.fillStyle = lineColor;
-      ctx.fill();
-    });
-  }, [viewingTests]);
-
-  useEffect(() => {
-    if (viewingUser && !viewingLoading && viewingTests.length >= 2) {
-      const t = setTimeout(drawChart, 200);
-      return () => clearTimeout(t);
-    }
-  }, [viewingUser, viewingLoading, viewingTests, drawChart]);
-
   if (!visible || !user) return null;
 
-  // Render the action button for a user based on relationship
+  // Inline action for a person row, based on relationship
   const renderActionButton = (uid) => {
     const rel = getRelationship(uid);
-    const loading = actionLoading === uid;
     const req = getRequestFor(uid);
 
-    if (loading) {
+    if (actionLoading === uid) {
       return (
-        <button className="social-action-btn" disabled>
-          ...
+        <button className="btn btn-sm" disabled>
+          …
         </button>
       );
     }
 
     switch (rel) {
       case "friends":
-        return (
-          <button
-            className="social-action-btn is-friend"
-            onClick={() => handleRemoveFriend(uid)}
-          >
-            remove
-          </button>
-        );
+        return <span className="person-state">friends</span>;
       case "requested":
         return (
-          <button
-            className="social-action-btn pending"
-            onClick={() => req && handleCancel(req)}
-          >
-            pending
+          <button className="btn btn-sm" onClick={() => req && handleCancel(req)} title="cancel request">
+            requested
           </button>
         );
       case "incoming":
         return (
-          <div className="social-action-group">
-            <button
-              className="social-action-btn accept"
-              onClick={() => req && handleAccept(req)}
-            >
+          <div className="person-actions">
+            <button className="btn btn-sm btn-primary" onClick={() => req && handleAccept(req)}>
               accept
             </button>
-            <button
-              className="social-action-btn decline"
-              onClick={() => req && handleDecline(req)}
-            >
+            <button className="btn btn-sm" onClick={() => req && handleDecline(req)} aria-label="decline">
               ✕
             </button>
           </div>
         );
       default:
         return (
-          <button
-            className="social-action-btn"
-            onClick={() => handleSendRequest(uid)}
-          >
-            add
+          <button className="btn btn-sm" onClick={() => handleSendRequest(uid)}>
+            add friend
           </button>
         );
     }
   };
 
-  // ── Sub-view: Viewing another user's profile ──
+  // ── Sub-view: another user's profile ──
   if (viewingUser) {
-    const stats = computeStats(viewingTests);
     const rel = getRelationship(viewingUser.uid);
     const req = getRequestFor(viewingUser.uid);
 
     const renderProfileAction = () => {
       if (actionLoading === viewingUser.uid) {
-        return <button className="social-friend-btn" disabled>...</button>;
+        return <button className="btn btn-sm" disabled>…</button>;
       }
       switch (rel) {
         case "friends":
           return (
-            <button
-              className="social-friend-btn is-friend"
-              onClick={() => handleRemoveFriend(viewingUser.uid)}
-            >
+            <button className="btn btn-sm btn-danger" onClick={() => handleRemoveFriend(viewingUser.uid)}>
               remove friend
             </button>
           );
         case "requested":
           return (
-            <button
-              className="social-friend-btn pending"
-              onClick={() => req && handleCancel(req)}
-            >
-              request sent
+            <button className="btn btn-sm" onClick={() => req && handleCancel(req)}>
+              cancel request
             </button>
           );
         case "incoming":
           return (
-            <div className="social-action-group">
-              <button
-                className="social-friend-btn accept"
-                onClick={() => req && handleAccept(req)}
-              >
+            <div className="person-actions">
+              <button className="btn btn-sm btn-primary" onClick={() => req && handleAccept(req)}>
                 accept request
               </button>
-              <button
-                className="social-friend-btn decline"
-                onClick={() => req && handleDecline(req)}
-              >
+              <button className="btn btn-sm" onClick={() => req && handleDecline(req)}>
                 decline
               </button>
             </div>
           );
         default:
           return (
-            <button
-              className="social-friend-btn"
-              onClick={() => handleSendRequest(viewingUser.uid)}
-            >
-              send request
+            <button className="btn btn-sm btn-primary" onClick={() => handleSendRequest(viewingUser.uid)}>
+              add friend
             </button>
           );
       }
     };
 
+    const name = viewingUser.displayName || viewingUser.username;
+
     return (
-      <div className="social-overlay visible">
-        <div className="social-container">
-          <div className="social-header">
+      <div className="page social-page">
+        <div className="page-inner">
+          <div className="page-bar">
             <button
-              className="social-back"
+              className="back-link"
               onClick={() => {
                 setViewingUser(null);
                 setViewingTests([]);
               }}
             >
-              back
+              back to friends
             </button>
-            {renderProfileAction()}
+            <div className="page-bar-actions">{renderProfileAction()}</div>
           </div>
 
-          {viewingLoading ? (
-            <div className="social-loading">loading...</div>
-          ) : (
-            <div className="social-profile-view">
-              <div className="social-user-hero">
-                {viewingUser.photoURL && (
-                  <img
-                    src={viewingUser.photoURL}
-                    alt=""
-                    className="social-avatar-lg"
-                    referrerPolicy="no-referrer"
-                  />
-                )}
-                <div>
-                  <h2 className="social-user-name">
-                    {viewingUser.displayName || viewingUser.username}
-                  </h2>
-                  <span className="social-user-handle">
-                    @{viewingUser.username}
-                  </span>
-                  {viewingUser.bio && (
-                    <p className="social-user-bio">{viewingUser.bio}</p>
-                  )}
-                </div>
-              </div>
-
-              {stats ? (
-                <>
-                  <div className="social-stats-grid">
-                    <div className="social-stat">
-                      <span className="social-stat-value">{stats.totalTests}</span>
-                      <span className="social-stat-label">tests</span>
-                    </div>
-                    <div className="social-stat">
-                      <span className="social-stat-value">{stats.bestWpm}</span>
-                      <span className="social-stat-label">best wpm</span>
-                    </div>
-                    <div className="social-stat">
-                      <span className="social-stat-value">{stats.avgWpm}</span>
-                      <span className="social-stat-label">avg wpm</span>
-                    </div>
-                    <div className="social-stat">
-                      <span className="social-stat-value">
-                        {stats.avgAccuracy}<small>%</small>
-                      </span>
-                      <span className="social-stat-label">accuracy</span>
-                    </div>
-                    <div className="social-stat">
-                      <span className="social-stat-value">
-                        {formatDuration(stats.totalTime)}
-                      </span>
-                      <span className="social-stat-label">practiced</span>
-                    </div>
-                  </div>
-
-                  {viewingTests.length >= 2 && (
-                    <div className="social-section">
-                      <h3 className="social-section-title">wpm progression</h3>
-                      <div className="social-chart-card">
-                        <canvas ref={chartRef} />
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="social-section">
-                    <h3 className="social-section-title">recent tests</h3>
-                    <div className="social-tests">
-                      {viewingTests.slice(0, 10).map((test) => (
-                        <div key={test.id} className="social-test-row">
-                          <span className="social-test-wpm">
-                            {test.wpm}<small> wpm</small>
-                          </span>
-                          <span className="social-test-acc">{test.accuracy}%</span>
-                          <span className="social-test-meta">
-                            {test.mode} / {test.duration}s
-                          </span>
-                          <span className="social-test-time">
-                            {timeAgo(test.completedAt)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </>
+          <header className="identity">
+            <div className="identity-avatar">
+              {viewingUser.photoURL ? (
+                <img src={viewingUser.photoURL} alt="" referrerPolicy="no-referrer" />
               ) : (
-                <div className="social-empty">No tests yet.</div>
+                <span>{name?.[0]?.toUpperCase()}</span>
               )}
             </div>
+            <div className="identity-main">
+              <h1 className="identity-name">{name}</h1>
+              <div className="identity-meta">
+                <span className="identity-handle">@{viewingUser.username}</span>
+                {rel === "friends" && <span className="identity-since">friend</span>}
+              </div>
+              {viewingUser.bio && <p className="identity-bio">{viewingUser.bio}</p>}
+            </div>
+          </header>
+
+          {viewingLoading ? (
+            <div className="profile-skeleton" aria-label="loading">
+              <span />
+              <span />
+              <span />
+            </div>
+          ) : (
+            <StatsView
+              tests={viewingTests}
+              emptyMessage={`${name} hasn't saved any tests yet.`}
+            />
           )}
         </div>
       </div>
     );
   }
 
-  // ── Main view: Search + Requests + Friends ──
+  // ── Main view: search, requests, friends ──
   return (
-    <div className="social-overlay visible">
-      <div className="social-container">
-        <div className="social-header">
-          <button className="social-back" onClick={onClose}>
-            back
+    <div className="page social-page">
+      <div className="page-inner narrow">
+        <div className="page-bar">
+          <button className="back-link" onClick={onClose}>
+            back to typing
           </button>
         </div>
 
-        {/* Search */}
-        <div className="social-search-wrapper">
-          <span className="social-search-icon">@</span>
+        <h1 className="page-title">friends</h1>
+
+        <label className="search">
+          <span className="search-at">@</span>
           <input
             ref={searchRef}
-            className="social-search"
             type="text"
             value={searchQuery}
             onChange={(e) => handleSearch(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
-            placeholder="search by username..."
+            placeholder="find someone by username"
             autoComplete="off"
             autoCorrect="off"
             spellCheck={false}
           />
-        </div>
+          {searching && <span className="search-status">searching</span>}
+        </label>
 
-        {/* Search Results */}
         {searchQuery.length >= 2 && (
-          <div className="social-section">
-            <h3 className="social-section-title">
-              {searching ? "searching..." : "results"}
-            </h3>
+          <section className="page-section">
+            <div className="section-head">
+              <span className="label">results</span>
+              {!searching && <span className="section-note">{searchResults.length} found</span>}
+            </div>
             {!searching && searchResults.length === 0 && (
-              <div className="social-empty">No users found.</div>
+              <p className="muted-note">No one goes by @{searchQuery}… yet.</p>
             )}
-            <div className="social-user-list">
+            <ul className="people">
               {searchResults.map((u) => (
-                <div key={u.uid} className="social-user-row">
-                  <div
-                    className="social-user-info"
-                    onClick={() => handleViewUser(u)}
-                  >
-                    {u.photoURL && (
-                      <img
-                        src={u.photoURL}
-                        alt=""
-                        className="social-avatar-sm"
-                        referrerPolicy="no-referrer"
-                      />
-                    )}
-                    <div className="social-user-text">
-                      <span className="social-user-row-name">
-                        {u.displayName || u.username}
-                      </span>
-                      <span className="social-user-row-handle">
-                        @{u.username}
-                      </span>
-                    </div>
-                  </div>
-                  {renderActionButton(u.uid)}
-                </div>
+                <Person key={u.uid} person={u} onOpen={() => handleViewUser(u)} action={renderActionButton(u.uid)} />
               ))}
-            </div>
-          </div>
+            </ul>
+          </section>
         )}
 
-        {/* Incoming Friend Requests */}
         {!loadingRequests && incomingRequests.length > 0 && (
-          <div className="social-section">
-            <h3 className="social-section-title">
-              friend requests ({incomingRequests.length})
-            </h3>
-            <div className="social-user-list">
-              {incomingRequests.map((req) => (
-                <div key={req.id} className="social-user-row">
-                  <div
-                    className="social-user-info"
-                    onClick={async () => {
-                      const prof = await getUserProfile(req.from);
-                      if (prof) handleViewUser(prof);
-                    }}
-                  >
-                    {req.fromPhotoURL && (
-                      <img
-                        src={req.fromPhotoURL}
-                        alt=""
-                        className="social-avatar-sm"
-                        referrerPolicy="no-referrer"
-                      />
-                    )}
-                    <div className="social-user-text">
-                      <span className="social-user-row-name">
-                        {req.fromDisplayName || req.fromUsername}
-                      </span>
-                      <span className="social-user-row-handle">
-                        @{req.fromUsername}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="social-action-group">
-                    <button
-                      className="social-action-btn accept"
-                      onClick={() => handleAccept(req)}
-                      disabled={actionLoading === req.from}
-                    >
-                      {actionLoading === req.from ? "..." : "accept"}
-                    </button>
-                    <button
-                      className="social-action-btn decline"
-                      onClick={() => handleDecline(req)}
-                      disabled={actionLoading === req.from}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
-              ))}
+          <section className="page-section">
+            <div className="section-head">
+              <span className="label">requests</span>
+              <span className="section-note">{incomingRequests.length} waiting</span>
             </div>
-          </div>
+            <ul className="people">
+              {incomingRequests.map((req) => (
+                <Person
+                  key={req.id}
+                  person={{
+                    photoURL: req.fromPhotoURL,
+                    displayName: req.fromDisplayName,
+                    username: req.fromUsername,
+                  }}
+                  onOpen={async () => {
+                    const prof = await getUserProfile(req.from);
+                    if (prof) handleViewUser(prof);
+                  }}
+                  action={
+                    <div className="person-actions">
+                      <button
+                        className="btn btn-sm btn-primary"
+                        onClick={() => handleAccept(req)}
+                        disabled={actionLoading === req.from}
+                      >
+                        {actionLoading === req.from ? "…" : "accept"}
+                      </button>
+                      <button
+                        className="btn btn-sm"
+                        onClick={() => handleDecline(req)}
+                        disabled={actionLoading === req.from}
+                        aria-label="decline"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  }
+                />
+              ))}
+            </ul>
+          </section>
         )}
 
-        {/* Friends */}
-        <div className="social-section">
-          <h3 className="social-section-title">
-            friends{friends.length > 0 ? ` (${friends.length})` : ""}
-          </h3>
+        <section className="page-section">
+          <div className="section-head">
+            <span className="label">your friends</span>
+            {friends.length > 0 && <span className="section-note">{friends.length}</span>}
+          </div>
           {loadingFriends ? (
-            <div className="social-empty">loading...</div>
+            <p className="muted-note">loading…</p>
           ) : friends.length === 0 ? (
-            <div className="social-empty">
-              Search for users above to add friends.
-            </div>
+            <p className="muted-note">
+              No friends yet. Search for a username above, then race them.
+            </p>
           ) : (
-            <div className="social-user-list">
+            <ul className="people">
               {friends.map((f) => (
-                <div key={f.uid} className="social-user-row">
-                  <div
-                    className="social-user-info"
-                    onClick={() => handleViewUser(f)}
-                  >
-                    {f.photoURL && (
-                      <img
-                        src={f.photoURL}
-                        alt=""
-                        className="social-avatar-sm"
-                        referrerPolicy="no-referrer"
-                      />
-                    )}
-                    <div className="social-user-text">
-                      <span className="social-user-row-name">
-                        {f.displayName || f.username}
-                      </span>
-                      <span className="social-user-row-handle">
-                        @{f.username}
-                      </span>
-                    </div>
-                  </div>
-                  <button
-                    className="social-action-btn view"
-                    onClick={() => handleViewUser(f)}
-                  >
-                    view
-                  </button>
-                </div>
+                <Person
+                  key={f.uid}
+                  person={f}
+                  onOpen={() => handleViewUser(f)}
+                  action={
+                    <button className="text-btn person-view" onClick={() => handleViewUser(f)}>
+                      view stats
+                    </button>
+                  }
+                />
               ))}
-            </div>
+            </ul>
           )}
-        </div>
+        </section>
       </div>
     </div>
   );

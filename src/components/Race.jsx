@@ -34,6 +34,25 @@ function getRankLabel(i) {
   return `${i + 1}th`;
 }
 
+function SegRow({ label, options, value, onChange }) {
+  return (
+    <div className="seg-row">
+      <span className="label">{label}</span>
+      <div className="seg">
+        {options.map((o) => (
+          <button
+            key={o.value}
+            className={`seg-opt ${value === o.value ? "active" : ""}`}
+            onClick={() => onChange(o.value)}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Race({ visible, user, profile, onClose }) {
   // ── Phase: "menu" | "lobby" | "join" | "countdown" | "racing" | "results"
   const [phase, setPhase] = useState("menu");
@@ -401,226 +420,232 @@ export default function Race({ visible, user, profile, onClose }) {
   // ── Subtitle helper ──
   const getSubtitle = () => {
     if (currentTestType === "wordcount") {
-      return `${raceData?.mode || raceMode} / ${currentWordCount} words`;
+      return `${raceData?.mode || raceMode}  /  ${currentWordCount} words`;
     }
-    return `${raceData?.mode || raceMode} / ${raceData?.duration || raceDuration}s`;
+    return `${raceData?.mode || raceMode}  /  ${raceData?.duration || raceDuration} seconds`;
   };
+
+  const standings = participantList
+    .map((p) => {
+      const prog = progress[p.uid];
+      const results = prog?.finalResults;
+      return {
+        ...p,
+        wpm: results?.wpm || prog?.wpm || 0,
+        accuracy: results?.accuracy || prog?.accuracy || 0,
+        isFinished: prog?.isFinished || false,
+      };
+    })
+    .sort((a, b) => b.wpm - a.wpm);
 
   // ── Render ──
   return (
-    <div className="race-overlay visible">
-      <div className="race-container">
+    <div className="page race-page">
+      <div className="page-inner">
         {/* ── Menu ── */}
         {phase === "menu" && (
           <>
-            <div className="race-header">
-              <button className="race-back" onClick={onClose}>
-                back
+            <div className="page-bar">
+              <button className="back-link" onClick={onClose}>
+                back to typing
               </button>
             </div>
+            <h1 className="page-title">race</h1>
+            <p className="race-lede">
+              Type the same text as your friends, live. Host a room and share the code, or join one.
+            </p>
+
             <div className="race-menu">
-              <h2 className="race-title">typing race</h2>
-              <p className="race-subtitle">
-                Compete with friends in real-time
-              </p>
-
-              <div className="race-menu-section">
-                <h3 className="race-section-label">create a race</h3>
-                <div className="race-settings-row">
-                  <div className="race-setting">
-                    <span className="race-setting-label">mode</span>
-                    <div className="race-setting-options">
-                      {["words", "sentences"].map((m) => (
-                        <button
-                          key={m}
-                          className={`race-setting-btn ${raceMode === m ? "active" : ""}`}
-                          onClick={() => setRaceMode(m)}
-                        >
-                          {m}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="race-setting">
-                    <span className="race-setting-label">test type</span>
-                    <div className="race-setting-options">
-                      {["time", "wordcount"].map((t) => (
-                        <button
-                          key={t}
-                          className={`race-setting-btn ${raceTestType === t ? "active" : ""}`}
-                          onClick={() => setRaceTestType(t)}
-                        >
-                          {t === "wordcount" ? "words" : "time"}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+              <section className="race-panel">
+                <div className="section-head">
+                  <span className="label">host a room</span>
                 </div>
-                <div className="race-settings-row">
-                  {raceTestType === "time" ? (
-                    <div className="race-setting">
-                      <span className="race-setting-label">duration</span>
-                      <div className="race-setting-options">
-                        {[15, 30, 60].map((d) => (
-                          <button
-                            key={d}
-                            className={`race-setting-btn ${raceDuration === d ? "active" : ""}`}
-                            onClick={() => setRaceDuration(d)}
-                          >
-                            {d}s
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="race-setting">
-                      <span className="race-setting-label">word count</span>
-                      <div className="race-setting-options">
-                        {[10, 25, 50, 100].map((wc) => (
-                          <button
-                            key={wc}
-                            className={`race-setting-btn ${raceWordCount === wc ? "active" : ""}`}
-                            onClick={() => setRaceWordCount(wc)}
-                          >
-                            {wc}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <button className="race-primary-btn" onClick={handleCreate}>
-                  create race
+                <SegRow
+                  label="text"
+                  value={raceMode}
+                  onChange={setRaceMode}
+                  options={[
+                    { value: "words", label: "words" },
+                    { value: "sentences", label: "sentences" },
+                  ]}
+                />
+                <SegRow
+                  label="length by"
+                  value={raceTestType}
+                  onChange={setRaceTestType}
+                  options={[
+                    { value: "time", label: "time" },
+                    { value: "wordcount", label: "words" },
+                  ]}
+                />
+                {raceTestType === "time" ? (
+                  <SegRow
+                    label="seconds"
+                    value={raceDuration}
+                    onChange={setRaceDuration}
+                    options={[15, 30, 60].map((d) => ({ value: d, label: d }))}
+                  />
+                ) : (
+                  <SegRow
+                    label="words"
+                    value={raceWordCount}
+                    onChange={setRaceWordCount}
+                    options={[10, 25, 50, 100].map((w) => ({ value: w, label: w }))}
+                  />
+                )}
+                <button className="btn btn-primary race-cta" onClick={handleCreate}>
+                  create room
                 </button>
-              </div>
+              </section>
 
-              <div className="race-divider">
-                <span>or</span>
-              </div>
-
-              <div className="race-menu-section">
-                <h3 className="race-section-label">join a race</h3>
-                <div className="race-join-row">
+              <section className="race-panel">
+                <div className="section-head">
+                  <span className="label">join a room</span>
+                </div>
+                <label className="code-cells" aria-label="room code">
                   <input
-                    className="race-code-input"
                     value={joinCode}
                     onChange={(e) =>
-                      setJoinCode(
-                        e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6)
-                      )
+                      setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6))
                     }
-                    placeholder="ENTER CODE"
+                    onKeyDown={(e) => e.key === "Enter" && handleJoin()}
                     maxLength={6}
                     autoComplete="off"
                     spellCheck={false}
+                    autoCapitalize="characters"
                   />
-                  <button
-                    className="race-primary-btn"
-                    onClick={handleJoin}
-                    disabled={joinCode.length < 6}
-                  >
-                    join
-                  </button>
-                </div>
-              </div>
-
-              {error && <div className="race-error">{error}</div>}
+                  {Array.from({ length: 6 }, (_, i) => (
+                    <span
+                      key={i}
+                      className={`code-cell ${joinCode[i] ? "filled" : ""} ${i === Math.min(joinCode.length, 5) ? "next" : ""}`}
+                    >
+                      {joinCode[i] || ""}
+                    </span>
+                  ))}
+                </label>
+                <p className="race-hint">Six characters, from the host's screen.</p>
+                <button
+                  className="btn race-cta"
+                  onClick={handleJoin}
+                  disabled={joinCode.length < 6}
+                >
+                  join room
+                </button>
+              </section>
             </div>
+
+            {error && <div className="race-error">{error}</div>}
           </>
         )}
 
         {/* ── Lobby ── */}
         {phase === "lobby" && raceData && (
           <>
-            <div className="race-header">
-              <button className="race-back" onClick={handleLeave}>
-                leave
+            <div className="page-bar">
+              <button className="back-link" onClick={handleLeave}>
+                leave room
               </button>
-              <div className="race-code-display" onClick={handleCopyCode}>
-                <span className="race-code-label">room code</span>
-                <span className="race-code-value">{raceData.code}</span>
-                <span className="race-code-copy">
-                  {copied ? "copied!" : "click to copy"}
-                </span>
-              </div>
+              <span className="race-spec">{getSubtitle()}</span>
             </div>
 
-            <div className="race-lobby">
-              <h2 className="race-title">waiting for players</h2>
-              <p className="race-subtitle">{getSubtitle()}</p>
+            <div className="room-code">
+              <span className="label">room code</span>
+              <button className="num room-code-value" onClick={handleCopyCode} title="copy code">
+                {raceData.code}
+              </button>
+              <button className="text-btn" onClick={handleCopyCode}>
+                {copied ? "copied to clipboard" : "copy code"}
+              </button>
+            </div>
 
-              <div className="race-participants">
-                {participantList.map((p) => (
-                  <div key={p.uid} className="race-participant">
-                    {p.photoURL && (
-                      <img
-                        src={p.photoURL}
-                        alt=""
-                        className="race-participant-avatar"
-                        referrerPolicy="no-referrer"
-                      />
-                    )}
-                    <div className="race-participant-info">
-                      <span className="race-participant-name">
-                        {p.displayName || p.username}
-                      </span>
-                      {p.username && (
-                        <span className="race-participant-handle">
-                          @{p.username}
-                        </span>
-                      )}
-                    </div>
-                    {p.uid === raceData.hostUid && (
-                      <span className="race-host-badge">host</span>
-                    )}
-                  </div>
-                ))}
+            <section className="page-section">
+              <div className="section-head">
+                <span className="label">players</span>
+                <span className="section-note">{participantList.length} of 10</span>
               </div>
+              <ol className="players">
+                {participantList.map((p, i) => (
+                  <li key={p.uid} className="player">
+                    <span className="num player-index">{String(i + 1).padStart(2, "0")}</span>
+                    <span className="person-avatar">
+                      {p.photoURL ? (
+                        <img src={p.photoURL} alt="" referrerPolicy="no-referrer" />
+                      ) : (
+                        (p.displayName || p.username || "?")[0].toUpperCase()
+                      )}
+                    </span>
+                    <span className="person-text">
+                      <span className="person-name">
+                        {p.displayName || p.username}
+                        {p.uid === user.uid && <span className="player-you"> (you)</span>}
+                      </span>
+                      {p.username && <span className="person-handle">@{p.username}</span>}
+                    </span>
+                    {p.uid === raceData.hostUid && <span className="tag">host</span>}
+                  </li>
+                ))}
+              </ol>
+            </section>
 
-              <div className="race-lobby-footer">
-                <span className="race-player-count">
-                  {participantList.length}/10 players
-                </span>
-                {isHost ? (
+            <div className="lobby-footer">
+              {isHost ? (
+                <>
+                  <span className="race-hint">
+                    {participantList.length < 2
+                      ? "Waiting for at least one more player."
+                      : "Everyone's in? Start when ready."}
+                  </span>
                   <button
-                    className="race-primary-btn"
+                    className="btn btn-primary"
                     onClick={handleStart}
                     disabled={participantList.length < 2}
                   >
                     start race
                   </button>
-                ) : (
-                  <span className="race-waiting-text">
-                    waiting for host to start...
-                  </span>
-                )}
-              </div>
-              {error && <div className="race-error">{error}</div>}
+                </>
+              ) : (
+                <span className="waiting">
+                  <span className="led on" />
+                  waiting for the host to start
+                </span>
+              )}
             </div>
+            {error && <div className="race-error">{error}</div>}
           </>
         )}
 
         {/* ── Countdown ── */}
         {phase === "countdown" && (
-          <div className="race-countdown-overlay">
-            <div className="race-countdown-number">{countdown}</div>
-            <div className="race-countdown-label">get ready</div>
+          <div className="countdown">
+            <span key={countdown} className="num countdown-value">
+              {countdown}
+            </span>
+            <span className="label">get ready</span>
           </div>
         )}
 
         {/* ── Racing ── */}
         {phase === "racing" && raceData && (
           <div className="race-active">
-            <div className="race-timer">
-              {currentTestType === "wordcount"
-                ? formatElapsed(typing.timeLeft)
-                : typing.timeLeft}
+            <div className="readout race-readout">
+              <div className="readout-cell">
+                <span className="num readout-value accent">
+                  {currentTestType === "wordcount" ? formatElapsed(typing.timeLeft) : typing.timeLeft}
+                </span>
+                <span className="label">
+                  {currentTestType === "wordcount" ? "elapsed" : "seconds left"}
+                </span>
+              </div>
+              <div className="readout-cell right">
+                <span className="num readout-value">{typing.liveWpm || "—"}</span>
+                <span className="label">wpm</span>
+              </div>
             </div>
 
-            {/* Progress tracks */}
-            <div className="race-tracks">
+            <ol className="lanes">
               {participantList.map((p) => {
-                const prog = p.uid === user.uid
+                const isSelf = p.uid === user.uid;
+                const prog = isSelf
                   ? {
                       currentWordIndex: typing.currentWordIndex,
                       wpm: typing.liveWpm,
@@ -628,49 +653,39 @@ export default function Race({ visible, user, profile, onClose }) {
                     }
                   : progress[p.uid] || { currentWordIndex: 0, wpm: 0 };
 
-                const maxWords = Math.max(
-                  ...participantList.map((pp) => {
-                    if (pp.uid === user.uid) return typing.currentWordIndex;
-                    return progress[pp.uid]?.currentWordIndex || 0;
-                  }),
-                  1
-                );
-                const pct = Math.min(100, (prog.currentWordIndex / Math.max(maxWords, 1)) * 100);
+                const target =
+                  currentTestType === "wordcount"
+                    ? currentWordCount
+                    : Math.max(
+                        ...participantList.map((pp) =>
+                          pp.uid === user.uid
+                            ? typing.currentWordIndex
+                            : progress[pp.uid]?.currentWordIndex || 0
+                        ),
+                        1
+                      );
+                const pct = Math.min(100, (prog.currentWordIndex / Math.max(target, 1)) * 100);
 
                 return (
-                  <div
+                  <li
                     key={p.uid}
-                    className={`race-track ${p.uid === user.uid ? "is-self" : ""} ${prog.isFinished ? "finished" : ""}`}
+                    className={`lane ${isSelf ? "is-self" : ""} ${prog.isFinished ? "finished" : ""}`}
                   >
-                    <div className="race-track-info">
-                      {p.photoURL && (
-                        <img
-                          src={p.photoURL}
-                          alt=""
-                          className="race-track-avatar"
-                          referrerPolicy="no-referrer"
-                        />
-                      )}
-                      <span className="race-track-name">
-                        {p.uid === user.uid ? "you" : p.username || p.displayName}
-                      </span>
-                    </div>
-                    <div className="race-track-bar">
-                      <div
-                        className="race-track-fill"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                    <span className="race-track-wpm">
-                      {prog.wpm}<small> wpm</small>
+                    <span className="lane-name">{isSelf ? "you" : p.username || p.displayName}</span>
+                    <span className="lane-track">
+                      <span className="lane-fill" style={{ width: `${pct}%` }} />
+                      <span className="lane-marker" style={{ left: `${pct}%` }} />
                     </span>
-                  </div>
+                    <span className="lane-wpm">
+                      <span className="num">{prog.wpm || 0}</span>
+                      <span className="lane-unit">wpm</span>
+                    </span>
+                  </li>
                 );
               })}
-            </div>
+            </ol>
 
-            {/* Typing area */}
-            <div className="race-typing-card">
+            <div className="race-typing">
               <TypingArea
                 words={typing.words}
                 typedWords={typing.typedWords}
@@ -690,122 +705,106 @@ export default function Race({ visible, user, profile, onClose }) {
         {/* ── Results ── */}
         {phase === "results" && raceData && (
           <>
-            <div className="race-header">
-              <button className="race-back" onClick={onClose}>
+            <div className="page-bar">
+              <button className="back-link" onClick={onClose}>
                 done
               </button>
+              <span className="race-spec">{getSubtitle()}</span>
             </div>
-            <div className="race-results">
-              <h2 className="race-title">race results</h2>
-              <p className="race-subtitle">{getSubtitle()}</p>
 
-              <div className="race-standings">
-                {participantList
-                  .map((p) => {
-                    const prog = progress[p.uid];
-                    const results = prog?.finalResults;
-                    return {
-                      ...p,
-                      wpm: results?.wpm || prog?.wpm || 0,
-                      accuracy: results?.accuracy || prog?.accuracy || 0,
-                      consistency: results?.consistency || 0,
-                      wordsTyped: results?.wordsTyped || prog?.currentWordIndex || 0,
-                      isFinished: prog?.isFinished || false,
-                    };
-                  })
-                  .sort((a, b) => b.wpm - a.wpm)
-                  .map((p, i) => (
-                    <div
-                      key={p.uid}
-                      className={`race-standing ${p.uid === user.uid ? "is-self" : ""} ${i === 0 ? "is-winner" : ""}`}
-                    >
-                      <span className="race-rank">
-                        {getRankLabel(i)}
-                      </span>
-                      <div className="race-standing-user">
-                        {p.photoURL && (
-                          <img
-                            src={p.photoURL}
-                            alt=""
-                            className="race-standing-avatar"
-                            referrerPolicy="no-referrer"
-                          />
-                        )}
-                        <div className="race-standing-info">
-                          <span className="race-standing-name">
-                            {p.uid === user.uid ? "you" : p.displayName || p.username}
-                          </span>
-                          {p.username && (
-                            <span className="race-standing-handle">
-                              @{p.username}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="race-standing-stats">
-                        <span className="race-standing-wpm">
-                          {p.wpm}<small> wpm</small>
-                        </span>
-                        <span className="race-standing-acc">
-                          {p.accuracy}%
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-              </div>
+            <h1 className="page-title">
+              {standings[0]?.uid === user.uid ? "you won" : "results"}
+            </h1>
 
-              {/* Session Stats */}
-              {sessionStats && (
-                <div className="race-session-stats">
-                  <h3 className="race-session-title">session stats</h3>
-                  <div className="race-session-grid">
-                    <div className="race-session-stat">
-                      <span className="race-session-stat-value">{sessionStats.totalRaces}</span>
-                      <span className="race-session-stat-label">races</span>
-                    </div>
-                    {sessionStats.topWinner && (
-                      <div className="race-session-stat">
-                        <span className="race-session-stat-value">{sessionStats.topWinner.name}</span>
-                        <span className="race-session-stat-label">most wins ({sessionStats.topWinner.wins})</span>
-                      </div>
-                    )}
-                    <div className="race-session-stat">
-                      <span className="race-session-stat-value">{sessionStats.myBestWpm}</span>
-                      <span className="race-session-stat-label">your best wpm</span>
-                    </div>
-                    <div className="race-session-stat">
-                      <span className="race-session-stat-value">{sessionStats.allBestWpm}</span>
-                      <span className="race-session-stat-label">best wpm (all)</span>
-                    </div>
-                    <div className="race-session-stat">
-                      <span className="race-session-stat-value">{sessionStats.myAvgWpm}</span>
-                      <span className="race-session-stat-label">your avg wpm</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {isHost ? (
-                <button
-                  className="race-primary-btn"
-                  style={{ marginTop: "1.5rem" }}
-                  onClick={async () => {
-                    try {
-                      const newWords = generateWordList(raceData.mode || "words", 200);
-                      await resetRace(raceId, newWords);
-                    } catch (err) {
-                      setError(err.message);
-                    }
-                  }}
+            <ol className="standings">
+              {standings.map((p, i) => (
+                <li
+                  key={p.uid}
+                  className={`standing ${p.uid === user.uid ? "is-self" : ""} ${i === 0 ? "is-winner" : ""}`}
                 >
-                  race again
-                </button>
+                  <span className="num standing-rank">{getRankLabel(i)}</span>
+                  <span className="person-avatar">
+                    {p.photoURL ? (
+                      <img src={p.photoURL} alt="" referrerPolicy="no-referrer" />
+                    ) : (
+                      (p.displayName || p.username || "?")[0].toUpperCase()
+                    )}
+                  </span>
+                  <span className="person-text">
+                    <span className="person-name">
+                      {p.uid === user.uid ? "you" : p.displayName || p.username}
+                    </span>
+                    {p.username && <span className="person-handle">@{p.username}</span>}
+                  </span>
+                  <span className="standing-acc">{p.accuracy}%</span>
+                  <span className="standing-wpm">
+                    <span className="num">{p.wpm}</span>
+                    <span className="lane-unit">wpm</span>
+                  </span>
+                </li>
+              ))}
+            </ol>
+
+            {sessionStats && sessionStats.totalRaces > 0 && (
+              <section className="page-section">
+                <div className="section-head">
+                  <span className="label">this session</span>
+                  <span className="section-note">
+                    {sessionStats.totalRaces} race{sessionStats.totalRaces === 1 ? "" : "s"}
+                  </span>
+                </div>
+                <dl className="session">
+                  {sessionStats.topWinner && (
+                    <div>
+                      <dt className="label">most wins</dt>
+                      <dd>
+                        {sessionStats.topWinner.name}
+                        <span> × {sessionStats.topWinner.wins}</span>
+                      </dd>
+                    </div>
+                  )}
+                  <div>
+                    <dt className="label">your best</dt>
+                    <dd>{sessionStats.myBestWpm}</dd>
+                  </div>
+                  <div>
+                    <dt className="label">your average</dt>
+                    <dd>{sessionStats.myAvgWpm}</dd>
+                  </div>
+                  <div>
+                    <dt className="label">room best</dt>
+                    <dd>{sessionStats.allBestWpm}</dd>
+                  </div>
+                </dl>
+              </section>
+            )}
+
+            <div className="lobby-footer">
+              {isHost ? (
+                <>
+                  <span className="race-hint">Same players, fresh text.</span>
+                  <button
+                    className="btn btn-primary"
+                    onClick={async () => {
+                      try {
+                        const newWords = generateWordList(raceData.mode || "words", 200);
+                        await resetRace(raceId, newWords);
+                      } catch (err) {
+                        setError(err.message);
+                      }
+                    }}
+                  >
+                    race again
+                  </button>
+                </>
               ) : (
-                <span className="race-waiting-text" style={{ marginTop: "1.5rem", display: "block", textAlign: "center" }}>
-                  waiting for host to start a new race...
+                <span className="waiting">
+                  <span className="led on" />
+                  waiting for the host to start another
                 </span>
               )}
             </div>
+            {error && <div className="race-error">{error}</div>}
           </>
         )}
       </div>

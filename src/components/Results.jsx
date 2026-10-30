@@ -201,7 +201,7 @@ export default function Results({
             </div>
             <div className="readout-item">
               <dt className="label">consistency</dt>
-              <dd>{results.consistency}%</dd>
+              <dd>{results.consistency === null ? "—" : `${results.consistency}%`}</dd>
             </div>
             <div className="readout-item">
               <dt className="label">time</dt>

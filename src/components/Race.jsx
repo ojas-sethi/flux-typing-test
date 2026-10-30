@@ -14,6 +14,7 @@ import {
   onProgressChange,
 } from "../services/raceService";
 import { saveRaceResult } from "../services/firestore";
+import { SCORING_VERSION } from "../utils/scoring";
 import { useRaceTypingTest } from "../hooks/useRaceTypingTest";
 import TypingArea from "./TypingArea";
 import "./Race.css";
@@ -266,10 +267,10 @@ export default function Race({ visible, user, profile, onClose }) {
             uid,
             displayName: data.displayName,
             username: data.username,
-            wpm: results?.wpm || prog?.wpm || 0,
-            accuracy: results?.accuracy || prog?.accuracy || 0,
-            consistency: results?.consistency || 0,
-            wordsTyped: results?.wordsTyped || prog?.currentWordIndex || 0,
+            wpm: results ? results.wpm : prog?.wpm || 0,
+            accuracy: results ? results.accuracy : prog?.accuracy || 0,
+            consistency: results?.consistency ?? null,
+            wordsTyped: results ? results.wordsTyped : prog?.currentWordIndex || 0,
           };
         })
         .sort((a, b) => b.wpm - a.wpm);
@@ -293,6 +294,7 @@ export default function Race({ visible, user, profile, onClose }) {
             totalParticipants: standings.length,
             raceId: raceData.id,
             won: myRank === 0,
+            scoringVersion: SCORING_VERSION,
           }).catch((err) => console.error("Failed to save race result:", err));
         }
       }
@@ -431,8 +433,8 @@ export default function Race({ visible, user, profile, onClose }) {
       const results = prog?.finalResults;
       return {
         ...p,
-        wpm: results?.wpm || prog?.wpm || 0,
-        accuracy: results?.accuracy || prog?.accuracy || 0,
+        wpm: results ? results.wpm : prog?.wpm || 0,
+        accuracy: results ? results.accuracy : prog?.accuracy || 0,
         isFinished: prog?.isFinished || false,
       };
     })

@@ -93,6 +93,7 @@ export const PB_WORDS = [10, 25, 50, 100];
 export function personalBests(tests) {
   const map = {};
   for (const t of tests) {
+    if (t.punctuation || t.numbers) continue;
     const mode = t.mode || "words";
     const isWords = t.testType === "wordcount";
     const len = isWords ? t.wordCount : Math.round(t.duration || 0);

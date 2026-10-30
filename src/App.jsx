@@ -3,6 +3,7 @@ import { useTypingTest } from "./hooks/useTypingTest";
 import { useTheme } from "./hooks/useTheme";
 import { useAuth } from "./hooks/useAuth";
 import { saveTestResult } from "./services/firestore";
+import { SCORING_VERSION } from "./utils/scoring";
 import Settings from "./components/Settings";
 import TypingArea from "./components/TypingArea";
 import Results from "./components/Results";
@@ -70,8 +71,9 @@ export default function App() {
       const r = getResults();
       setResults(r);
 
-      // Personal best tracking (per test configuration, stored locally)
-      const pbKey = `klacks-pb-${mode}-${testType}-${testType === "time" ? duration : wordCountTarget}`;
+      // Personal best tracking (per exact test configuration, stored locally)
+      const mods = mode === "words" ? `${punctuation ? "-p" : ""}${numbers ? "-n" : ""}` : "";
+      const pbKey = `klacks-pb-${mode}-${testType}-${testType === "time" ? duration : wordCountTarget}${mods}`;
       const prevBest = parseInt(localStorage.getItem(pbKey), 10) || 0;
       const isNew = prevBest > 0 && r.wpm > prevBest;
       if (r.wpm > prevBest) {
@@ -94,8 +96,11 @@ export default function App() {
           missedChars: r.missedChars,
           mode,
           testType,
+          punctuation: mode === "words" && punctuation,
+          numbers: mode === "words" && numbers,
           duration: testType === "time" ? duration : r.timeTaken,
           wpmHistory: r.wpmHistory,
+          scoringVersion: SCORING_VERSION,
         };
         if (testType === "wordcount") {
           saveData.wordCount = wordCountTarget;
@@ -110,7 +115,7 @@ export default function App() {
       setSaveStatus(null);
       setPersonalBest(null);
     }
-  }, [isFinished, getResults, user, mode, testType, duration, wordCountTarget]);
+  }, [isFinished, getResults, user, mode, testType, duration, wordCountTarget, punctuation, numbers]);
 
   // Restart handler
   const handleRestart = useCallback(() => {

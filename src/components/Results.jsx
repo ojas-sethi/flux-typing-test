@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useEffect, useRef, useCallback, useState, useMemo } from "react";
 import { setupCanvas, cssVar, niceMax, drawGrid, AXIS_FONT } from "../utils/chart";
 import "./Results.css";
 
@@ -17,7 +17,7 @@ export default function Results({
   const [hover, setHover] = useState(null); // { i, x }
   const [copied, setCopied] = useState(false);
 
-  const data = results?.wpmHistory || [];
+  const data = useMemo(() => results?.wpmHistory || [], [results]);
 
   const drawChart = useCallback(
     (hoverIndex = null) => {
@@ -138,6 +138,9 @@ export default function Results({
   const specParts = [];
   if (testConfig) {
     specParts.push(testConfig.mode);
+    if (testConfig.mode === "quotes" && testConfig.quoteLength !== "any") {
+      specParts.push(testConfig.quoteLength);
+    }
     specParts.push(
       testConfig.testType === "time"
         ? `${testConfig.duration} seconds`
@@ -151,7 +154,8 @@ export default function Results({
     testConfig?.testType === "time" ? testConfig.duration : results.timeTaken;
 
   const handleCopy = () => {
-    const text = `klacks — ${results.wpm} wpm, ${results.accuracy}% accuracy (${specParts.join(", ")})`;
+    const credit = testConfig?.quote ? ` typing ${testConfig.quote.author}, ${testConfig.quote.source}` : "";
+    const text = `klacks — ${results.wpm} wpm, ${results.accuracy}% accuracy${credit} (${specParts.join(", ")})`;
     navigator.clipboard?.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
@@ -181,6 +185,17 @@ export default function Results({
             )
           )}
         </div>
+
+        {testConfig?.quote && (
+          <p className="results-quote">
+            <span className="results-quote-mark" aria-hidden="true">&ldquo;</span>
+            <span>
+              <strong>{testConfig.quote.author}</strong>
+              <cite>{testConfig.quote.source}</cite>
+              <span className="results-quote-year">{testConfig.quote.year}</span>
+            </span>
+          </p>
+        )}
 
         <div className="results-main">
           <div className="hero">

@@ -3,7 +3,15 @@ import "./Settings.css";
 
 const MODES = [
   { key: "words", label: "words", hint: "common english words" },
-  { key: "sentences", label: "sentences", hint: "real passages, with punctuation" },
+  { key: "sentences", label: "sentences", hint: "everyday prose, with punctuation" },
+  { key: "quotes", label: "quotes", hint: "one real quote, with its author" },
+];
+
+const QUOTE_LENGTH_OPTIONS = [
+  { key: "any", label: "any length", hint: "a mix of everything" },
+  { key: "short", label: "short", hint: "up to 15 words" },
+  { key: "medium", label: "medium", hint: "16 to 30 words" },
+  { key: "long", label: "long", hint: "more than 30 words" },
 ];
 
 const DURATIONS = [15, 30, 60, 120];
@@ -58,6 +66,8 @@ export default function Settings({
   wordCountTarget,
   punctuation,
   numbers,
+  quoteLength,
+  onQuoteLengthChange,
   onModeChange,
   onDurationChange,
   onWordCountChange,
@@ -94,48 +104,74 @@ export default function Settings({
 
         <span className="spec-sep" aria-hidden="true">/</span>
 
-        <Token label={lengthLabel} title="length">
-          {(close) => (
-            <div className="pop-grid">
-              <span className="label pop-grid-label">seconds</span>
-              <div className="pop-cells">
-                {DURATIONS.map((d) => (
-                  <button
-                    key={`t${d}`}
-                    role="menuitemradio"
-                    aria-checked={testType === "time" && duration === d}
-                    className={`pop-cell ${testType === "time" && duration === d ? "active" : ""}`}
-                    onClick={() => {
-                      onDurationChange(d);
-                      close();
-                    }}
-                    tabIndex={-1}
-                  >
-                    {d}
-                  </button>
-                ))}
+        {mode === "quotes" ? (
+          <Token
+            label={quoteLength === "any" ? "any length" : `${quoteLength} quotes`}
+            title="quote length"
+          >
+            {(close) =>
+              QUOTE_LENGTH_OPTIONS.map((o) => (
+                <button
+                  key={o.key}
+                  role="menuitemradio"
+                  aria-checked={quoteLength === o.key}
+                  className={`pop-row ${quoteLength === o.key ? "active" : ""}`}
+                  onClick={() => {
+                    onQuoteLengthChange(o.key);
+                    close();
+                  }}
+                  tabIndex={-1}
+                >
+                  <span className="pop-row-name">{o.label}</span>
+                  <span className="pop-row-hint">{o.hint}</span>
+                </button>
+              ))
+            }
+          </Token>
+        ) : (
+          <Token label={lengthLabel} title="length">
+            {(close) => (
+              <div className="pop-grid">
+                <span className="label pop-grid-label">seconds</span>
+                <div className="pop-cells">
+                  {DURATIONS.map((d) => (
+                    <button
+                      key={`t${d}`}
+                      role="menuitemradio"
+                      aria-checked={testType === "time" && duration === d}
+                      className={`pop-cell ${testType === "time" && duration === d ? "active" : ""}`}
+                      onClick={() => {
+                        onDurationChange(d);
+                        close();
+                      }}
+                      tabIndex={-1}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
+                <span className="label pop-grid-label">words</span>
+                <div className="pop-cells">
+                  {WORD_COUNTS.map((c) => (
+                    <button
+                      key={`w${c}`}
+                      role="menuitemradio"
+                      aria-checked={testType === "wordcount" && wordCountTarget === c}
+                      className={`pop-cell ${testType === "wordcount" && wordCountTarget === c ? "active" : ""}`}
+                      onClick={() => {
+                        onWordCountChange(c);
+                        close();
+                      }}
+                      tabIndex={-1}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <span className="label pop-grid-label">words</span>
-              <div className="pop-cells">
-                {WORD_COUNTS.map((c) => (
-                  <button
-                    key={`w${c}`}
-                    role="menuitemradio"
-                    aria-checked={testType === "wordcount" && wordCountTarget === c}
-                    className={`pop-cell ${testType === "wordcount" && wordCountTarget === c ? "active" : ""}`}
-                    onClick={() => {
-                      onWordCountChange(c);
-                      close();
-                    }}
-                    tabIndex={-1}
-                  >
-                    {c}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </Token>
+            )}
+          </Token>
+        )}
       </div>
 
       <div className={`mods ${modifiersDisabled ? "disabled" : ""}`}>

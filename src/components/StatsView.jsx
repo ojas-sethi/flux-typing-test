@@ -61,13 +61,18 @@ export default function StatsView({ tests, races = [], emptyMessage, emptyAction
   const pbs = useMemo(() => personalBests(tests), [tests]);
   const topId = useMemo(() => summarize(tests)?.best.id, [tests]);
 
-  const wordsCount = useMemo(() => tests.filter((t) => (t.mode || "words") === "words").length, [tests]);
+  const modeCounts = useMemo(() => {
+    const counts = { words: 0, sentences: 0, quotes: 0 };
+    for (const t of tests) counts[t.mode || "words"] = (counts[t.mode || "words"] || 0) + 1;
+    return counts;
+  }, [tests]);
 
   const filters = [
     { key: "solo", label: "all tests", count: tests.length },
-    { key: "words", label: "words", count: wordsCount },
-    { key: "sentences", label: "sentences", count: tests.length - wordsCount },
+    { key: "words", label: "words", count: modeCounts.words },
+    { key: "sentences", label: "sentences", count: modeCounts.sentences },
   ];
+  if (modeCounts.quotes) filters.push({ key: "quotes", label: "quotes", count: modeCounts.quotes });
   if (races.length) filters.push({ key: "races", label: "races", count: races.length });
 
   if (!tests.length && !races.length) {

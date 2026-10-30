@@ -32,6 +32,7 @@
 
 .typing-area::after {
   content: "";
+  display: none;
   position: absolute;
   bottom: 0;
   left: 0;
@@ -40,6 +41,10 @@
   background: linear-gradient(transparent, var(--bg));
   pointer-events: none;
   z-index: 2;
+}
+
+.typing-area[data-more="true"]::after {
+  display: block;
 }
 
 .words {

@@ -210,6 +210,11 @@ export default function TypingArea({
       wordsRef.current.style.transform = "translateY(0px)";
     }
 
+    // Fade the last visible line only when more text follows below it.
+    // A data attribute, because React owns className.
+    const visibleBottom = areaRef.current.clientHeight - scrollOffsetRef.current;
+    areaRef.current.dataset.more = String(wordsRef.current.offsetHeight > visibleBottom + 1);
+
     // Position vertical line caret centered in the line
     const lineH = fontSize * 2.2;
     const caretTop = rawTop + lineH * 0.22;

@@ -50,10 +50,10 @@ export function configLabel(item) {
 const avg = (arr, key) =>
   arr.length ? Math.round(arr.reduce((s, t) => s + (t[key] || 0), 0) / arr.length) : 0;
 
-// Filter keys: "solo" | "words" | "sentences" | "races"
+// Filter keys: "solo" | "words" | "sentences" | "quotes" | "races"
 export function filterHistory(tests, races, filter) {
   if (filter === "races") return races;
-  if (filter === "words" || filter === "sentences") {
+  if (filter === "words" || filter === "sentences" || filter === "quotes") {
     return tests.filter((t) => (t.mode || "words") === filter);
   }
   return tests;

@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { generateWordList } from "../data/words";
+import { pickQuote, QUOTE_LENGTHS } from "../data/quotes";
 import {
   wpmFrom,
   classifyInsert,
@@ -16,7 +17,7 @@ function loadSettings() {
   try {
     const raw = JSON.parse(localStorage.getItem("klacks-settings")) || {};
     return {
-      mode: raw.mode === "sentences" ? "sentences" : "words",
+      mode: ["sentences", "quotes"].includes(raw.mode) ? raw.mode : "words",
       testType: raw.testType === "wordcount" ? "wordcount" : "time",
       duration: VALID_DURATIONS.includes(raw.duration) ? raw.duration : 15,
       wordCountTarget: VALID_WORD_COUNTS.includes(raw.wordCountTarget)
@@ -24,6 +25,7 @@ function loadSettings() {
         : 25,
       punctuation: !!raw.punctuation,
       numbers: !!raw.numbers,
+      quoteLength: QUOTE_LENGTHS.includes(raw.quoteLength) ? raw.quoteLength : "any",
     };
   } catch {
     return {
@@ -33,8 +35,22 @@ function loadSettings() {
       wordCountTarget: 25,
       punctuation: false,
       numbers: false,
+      quoteLength: "any",
     };
   }
+}
+
+const RECENT_QUOTES = 15;
+
+// Words for a new test. A quote test is exactly one quote.
+function buildTest(mode, options, quoteLength, recentQuotes) {
+  if (mode === "quotes") {
+    const quote = pickQuote(quoteLength, recentQuotes);
+    recentQuotes.push(quote.id);
+    if (recentQuotes.length > RECENT_QUOTES) recentQuotes.shift();
+    return { words: quote.text.split(" "), quote };
+  }
+  return { words: generateWordList(mode, INITIAL_WORD_COUNT, options), quote: null };
 }
 
 const EMPTY_POINT = { at: 0, second: 0, keys: 0, errors: 0 };
@@ -47,7 +63,14 @@ function tallyKeys(keys, prev, next, target) {
 
 export function useTypingTest() {
   const initialRef = useRef(null);
-  if (initialRef.current === null) initialRef.current = loadSettings();
+  const recentQuotesRef = useRef([]);
+  if (initialRef.current === null) {
+    const settings = loadSettings();
+    initialRef.current = {
+      ...settings,
+      test: buildTest(settings.mode, settings, settings.quoteLength, recentQuotesRef.current),
+    };
+  }
   const init = initialRef.current;
 
   const [mode, setMode] = useState(init.mode);
@@ -56,12 +79,9 @@ export function useTypingTest() {
   const [wordCountTarget, setWordCountTarget] = useState(init.wordCountTarget);
   const [punctuation, setPunctuation] = useState(init.punctuation);
   const [numbers, setNumbers] = useState(init.numbers);
-  const [words, setWords] = useState(() =>
-    generateWordList(init.mode, INITIAL_WORD_COUNT, {
-      punctuation: init.punctuation,
-      numbers: init.numbers,
-    })
-  );
+  const [quoteLength, setQuoteLength] = useState(init.quoteLength);
+  const [quote, setQuote] = useState(init.test.quote);
+  const [words, setWords] = useState(init.test.words);
   const [typedWords, setTypedWords] = useState([]);
   const [currentInput, setCurrentInput] = useState("");
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
@@ -94,23 +114,30 @@ export function useTypingTest() {
   const durationRef = useRef(duration);
   const wordCountTargetRef = useRef(wordCountTarget);
   const optionsRef = useRef({ punctuation, numbers });
+  const quoteLengthRef = useRef(quoteLength);
+
+  // A quote test behaves like a word-count test sized to the quote
+  const isQuote = mode === "quotes";
+  const effectiveTestType = isQuote ? "wordcount" : testType;
+  const effectiveTarget = isQuote ? words.length : wordCountTarget;
 
   wordsRef.current = words;
   typedWordsRef.current = typedWords;
   currentInputRef.current = currentInput;
   currentWordIndexRef.current = currentWordIndex;
-  testTypeRef.current = testType;
+  testTypeRef.current = effectiveTestType;
   durationRef.current = duration;
-  wordCountTargetRef.current = wordCountTarget;
+  wordCountTargetRef.current = effectiveTarget;
   optionsRef.current = { punctuation, numbers };
+  quoteLengthRef.current = quoteLength;
 
   // Persist settings
   useEffect(() => {
     localStorage.setItem(
       "klacks-settings",
-      JSON.stringify({ mode, testType, duration, wordCountTarget, punctuation, numbers })
+      JSON.stringify({ mode, testType, duration, wordCountTarget, punctuation, numbers, quoteLength })
     );
-  }, [mode, testType, duration, wordCountTarget, punctuation, numbers]);
+  }, [mode, testType, duration, wordCountTarget, punctuation, numbers, quoteLength]);
 
   const lastIndex = useCallback(
     () => (testTypeRef.current === "wordcount" ? wordCountTargetRef.current - 1 : Infinity),
@@ -267,7 +294,7 @@ export function useTypingTest() {
           return;
         }
 
-        if (nextIndex >= wordsRef.current.length - 20) {
+        if (mode !== "quotes" && nextIndex >= wordsRef.current.length - 20) {
           setWords((prevWords) => [
             ...prevWords,
             ...generateWordList(mode, INITIAL_WORD_COUNT, optionsRef.current),
@@ -360,7 +387,9 @@ export function useTypingTest() {
     clearInterval(timerRef.current);
     clearTimeout(deadlineRef.current);
     const options = opts || optionsRef.current;
-    setWords(generateWordList(newMode, INITIAL_WORD_COUNT, options));
+    const test = buildTest(newMode, options, quoteLengthRef.current, recentQuotesRef.current);
+    setWords(test.words);
+    setQuote(test.quote);
     setTypedWords([]);
     setCurrentInput("");
     setCurrentWordIndex(0);
@@ -417,6 +446,16 @@ export function useTypingTest() {
     [mode, duration, fullReset]
   );
 
+  // Change quote length (quotes mode)
+  const changeQuoteLength = useCallback(
+    (newLength) => {
+      setQuoteLength(newLength);
+      quoteLengthRef.current = newLength;
+      fullReset(mode, testType, duration, wordCountTarget);
+    },
+    [mode, testType, duration, wordCountTarget, fullReset]
+  );
+
   // Toggle punctuation (words mode)
   const togglePunctuation = useCallback(() => {
     const next = !punctuation;
@@ -433,9 +472,12 @@ export function useTypingTest() {
 
   return {
     mode,
-    testType,
+    testType: effectiveTestType,
     duration,
-    wordCountTarget,
+    wordCountTarget: effectiveTarget,
+    quoteLength,
+    quote,
+    changeQuoteLength,
     punctuation,
     numbers,
     liveWpm,

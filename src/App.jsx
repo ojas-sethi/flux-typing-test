@@ -22,6 +22,9 @@ export default function App() {
     testType,
     duration,
     wordCountTarget,
+    quoteLength,
+    quote,
+    changeQuoteLength,
     punctuation,
     numbers,
     liveWpm,
@@ -71,15 +74,20 @@ export default function App() {
       const r = getResults();
       setResults(r);
 
-      // Personal best tracking (per exact test configuration, stored locally)
-      const mods = mode === "words" ? `${punctuation ? "-p" : ""}${numbers ? "-n" : ""}` : "";
-      const pbKey = `klacks-pb-${mode}-${testType}-${testType === "time" ? duration : wordCountTarget}${mods}`;
-      const prevBest = parseInt(localStorage.getItem(pbKey), 10) || 0;
-      const isNew = prevBest > 0 && r.wpm > prevBest;
-      if (r.wpm > prevBest) {
-        localStorage.setItem(pbKey, String(r.wpm));
+      // Personal best tracking (per exact test configuration, stored locally).
+      // Quotes are skipped: every quote is a different text.
+      if (mode === "quotes") {
+        setPersonalBest(null);
+      } else {
+        const mods = mode === "words" ? `${punctuation ? "-p" : ""}${numbers ? "-n" : ""}` : "";
+        const pbKey = `klacks-pb-${mode}-${testType}-${testType === "time" ? duration : wordCountTarget}${mods}`;
+        const prevBest = parseInt(localStorage.getItem(pbKey), 10) || 0;
+        const isNew = prevBest > 0 && r.wpm > prevBest;
+        if (r.wpm > prevBest) {
+          localStorage.setItem(pbKey, String(r.wpm));
+        }
+        setPersonalBest({ prev: prevBest, isNew });
       }
-      setPersonalBest({ prev: prevBest, isNew });
 
       // Auto-save if logged in
       if (user) {
@@ -105,6 +113,9 @@ export default function App() {
         if (testType === "wordcount") {
           saveData.wordCount = wordCountTarget;
         }
+        if (quote) {
+          saveData.quote = { author: quote.author, source: quote.source, year: quote.year };
+        }
         saveTestResult(user.uid, saveData)
           .then(() => setSaveStatus("saved"))
           .catch(() => setSaveStatus("error"));
@@ -115,7 +126,7 @@ export default function App() {
       setSaveStatus(null);
       setPersonalBest(null);
     }
-  }, [isFinished, getResults, user, mode, testType, duration, wordCountTarget, punctuation, numbers]);
+  }, [isFinished, getResults, user, mode, testType, duration, wordCountTarget, punctuation, numbers, quote]);
 
   // Restart handler
   const handleRestart = useCallback(() => {
@@ -280,6 +291,8 @@ export default function App() {
                   wordCountTarget={wordCountTarget}
                   punctuation={punctuation}
                   numbers={numbers}
+                  quoteLength={quoteLength}
+                  onQuoteLengthChange={changeQuoteLength}
                   onModeChange={changeMode}
                   onDurationChange={changeDuration}
                   onWordCountChange={changeWordCount}
@@ -311,6 +324,14 @@ export default function App() {
                 onClearCurrentWord={clearCurrentWord}
               />
             </div>
+
+            {quote && (
+              <p className="quote-credit">
+                <span className="quote-author">{quote.author}</span>
+                <cite>{quote.source}</cite>
+                <span className="quote-year">{quote.year}</span>
+              </p>
+            )}
           </div>
         </main>
 
@@ -339,7 +360,7 @@ export default function App() {
         saveStatus={saveStatus}
         isLoggedIn={!!user}
         personalBest={personalBest}
-        testConfig={{ mode, testType, duration, wordCountTarget, punctuation, numbers }}
+        testConfig={{ mode, testType, duration, wordCountTarget, punctuation, numbers, quoteLength, quote }}
       />
 
       <Profile
